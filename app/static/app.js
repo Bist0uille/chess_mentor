@@ -237,12 +237,14 @@ function setupOverlay() {
   // marqueur de pointe de flèche
   svg.innerHTML =
     `<defs>
-       <marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
-         markerHeight="4" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker>
-       <marker id="ahr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
-         markerHeight="4" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 z" fill="${REFUTE_COLOR}"/></marker>
+       <marker id="ah" viewBox="0 0 10 10" refX="7.2" refY="5" markerWidth="4.4"
+         markerHeight="4.4" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 L3.4,5 z" fill="${ARROW_COLOR}"
+           stroke="${ARROW_COLOR}" stroke-width="1.1" stroke-linejoin="round"/></marker>
+       <marker id="ahr" viewBox="0 0 10 10" refX="7.2" refY="5" markerWidth="4.4"
+         markerHeight="4.4" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 L3.4,5 z" fill="${REFUTE_COLOR}"
+           stroke="${REFUTE_COLOR}" stroke-width="1.1" stroke-linejoin="round"/></marker>
      </defs>
      <g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
   $boardEl.style.position = "relative";
@@ -510,6 +512,7 @@ function rectHighlight(g, sq, color) {
   const r = document.createElementNS(NS, "rect");
   r.setAttribute("x", c.x - sqSize / 2); r.setAttribute("y", c.y - sqSize / 2);
   r.setAttribute("width", sqSize); r.setAttribute("height", sqSize);
+  r.setAttribute("rx", sqSize * 0.14); r.setAttribute("ry", sqSize * 0.14);
   r.setAttribute("fill", color);
   g.appendChild(r);
 }
@@ -525,8 +528,9 @@ function drawArrow(g, from, to, color, marker) {
   line.setAttribute("x1", a0.x); line.setAttribute("y1", a0.y);
   line.setAttribute("x2", ex); line.setAttribute("y2", ey);
   line.setAttribute("stroke", color);
-  line.setAttribute("stroke-width", sqSize * 0.16);
+  line.setAttribute("stroke-width", sqSize * 0.15);
   line.setAttribute("stroke-linecap", "round");
+  line.setAttribute("stroke-linejoin", "round");
   line.setAttribute("marker-end", `url(#${marker})`);
   g.appendChild(line);
 }
