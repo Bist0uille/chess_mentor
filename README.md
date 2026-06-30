@@ -1,5 +1,7 @@
 # ♟️ Chess Mentor — coach de raisonnement
 
+**En ligne : https://chess-mentor-ten.vercel.app**
+
 Un coach d'échecs qui n'apprend pas à *mémoriser* des solutions, mais à
 **raisonner**. Au lieu de balancer le coup, il identifie les **signaux faibles**
 d'une position (roi sans case de fuite, pièce non défendue, pièces alignées,
@@ -28,8 +30,8 @@ Le cœur, ce sont les **détecteurs** + l'**annotateur** (`explain.py`) : ils
 analysent la solution coup par coup et produisent des indices factuels, sans
 jamais inventer un coup ou une pièce.
 
-Un **moteur d'échecs tourne aussi dans le navigateur** (Lozza, UCI, JS pur, MIT —
-`static/lozza.js`) : il fournit la barre d'évaluation et **réfute tes mauvais
+Un **moteur d'échecs tourne aussi dans le navigateur** (Lozza, UCI, JS pur, GPL-3.0
+— `static/lozza.js`) : il fournit la barre d'évaluation et **réfute tes mauvais
 essais** (« après ton coup, l'adversaire joue … et tu es perdant »). 100% côté
 client : aucun coût serveur, aucun token.
 
@@ -57,6 +59,18 @@ Le projet est prêt pour Vercel (Python serverless) :
   `ANTHROPIC_API_KEY` est présent. Modèle : `CHESS_COACH_MODEL` (défaut `claude-haiku-4-5`).
   Sans clé (ou `CHESS_COACH_LLM=off`) → indices-gabarits déterministes, gratuits.
 
+### Coût & sécurité (site public)
+
+Le projet ne stocke aucune donnée utilisateur et n'écrit rien (lecture seule). Aucun
+secret n'est dans le dépôt — la clé API vit uniquement dans les variables
+d'environnement de l'hébergeur.
+
+⚠️ **Si le narrateur LLM est activé sur un site public**, n'importe qui peut déclencher
+des appels (≈ 0,2 centime/problème), facturés sur ton compte Anthropic. Avant de publier :
+- définis une **limite de dépense** dans la console Anthropic (Settings → Limits) ;
+- ou laisse `CHESS_COACH_LLM=off` (indices-gabarits, 100 % gratuits) ;
+- il n'y a pas de limitation de débit intégrée — ajoute-en une si tu attends du trafic.
+
 ## Tests
 
 Suite automatique (locale) : backend pytest + E2E navigateur (Playwright) + unitaire JS.
@@ -80,9 +94,10 @@ node tests/test_engine.js   # fonctions pures du moteur (engine.js)
 
 | Méthode | Route | Rôle |
 |---|---|---|
-| GET | `/api/puzzle?min_rating=&max_rating=&min_plies=` | tire un puzzle (sans la solution) |
-| POST | `/api/attempt {id, uci, ply}` | valide le coup du solveur, joue la réponse adverse |
-| POST | `/api/hint {id, level}` | indice progressif (1=nudge → 4=ligne) |
+| GET | `/api/puzzle?min_rating=&max_rating=&min_plies=&id=` | tire un puzzle (ou `id` précis), sans la solution |
+| POST | `/api/attempt {id, uci, ply}` | valide le coup du solveur, joue la réponse adverse, explique |
+| GET | `/api/hints?id=&target_elo=` | les indices progressifs (3 affichés : du vague au précis) |
+| GET | `/api/solution?id=` | ligne complète (UCI + SAN + notes) |
 
 ## Structure
 
@@ -98,4 +113,21 @@ data/puzzles.sqlite     base de puzzles (Lichess, CC0)
 scripts/build_db.py     (re)construit la base
 ```
 
-Données : [base ouverte de puzzles Lichess](https://database.lichess.org/) (CC0).
+## Crédits & licences
+
+Code du projet : **MIT** (voir `LICENSE`). Composants tiers (chacun sous sa licence) :
+
+| Composant | Usage | Licence |
+|---|---|---|
+| [Lichess puzzles](https://database.lichess.org/) | base de problèmes (`data/`) | CC0 |
+| [Lozza](https://github.com/op12no2/lozza) | moteur d'échecs navigateur (`static/lozza.js`) | GPL-3.0 |
+| [chessboard.js](https://chessboardjs.com/) | échiquier | MIT |
+| [chess.js](https://github.com/jhlywa/chess.js) | règles côté client | BSD-2-Clause |
+| [jQuery](https://jquery.com/) | dépendance de chessboard.js | MIT |
+| python-chess, FastAPI | backend | (resp. GPL-3.0, MIT) |
+| pièces « cburnett » (via chessboardjs.com) | images des pièces | GPL-2.0+ |
+
+## Licence
+
+Code du projet sous licence **MIT** — voir [`LICENSE`](LICENSE). Les composants tiers
+embarqués (notamment Lozza, GPL-3.0) conservent leur propre licence.
