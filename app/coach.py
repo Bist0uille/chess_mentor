@@ -139,36 +139,38 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
 
     client = anthropic.Anthropic()  # lit ANTHROPIC_API_KEY dans l'environnement
     side = "les Blancs" if board.turn == chess.WHITE else "les Noirs"
-    facts = [s.short for s in signals] or ["(aucun signal saillant détecté)"]
-    first_san = _first_solver_move_san(board, sol_uci)
+    # Base VÉRIFIÉE et déjà centrée sur la solution (évite les signaux hors-sujet).
+    base = explain.build_hints(board, sol_uci, themes, target_elo, signals)
 
     system = (
-        "Tu es un entraîneur d'échecs francophone. Ton rôle : apprendre à RAISONNER, "
-        "pas à mémoriser. Tu reçois des SIGNAUX déjà vérifiés par un moteur "
-        "déterministe et la solution. Règles absolues :\n"
-        "1. N'affirme QUE ce qui figure dans les signaux ou la solution fournis ; "
-        "n'invente aucun coup, aucune pièce, aucune case.\n"
-        "2. Écris en français à 100 % — aucun mot anglais, y compris pour les "
-        "thèmes (dis « fourchette », pas « fork »).\n"
-        "3. Utilise la notation française des pièces : R (roi), D (dame), T (tour), "
-        "F (fou), C (cavalier). Jamais K/Q/R/B/N."
+        "Tu es un entraîneur d'échecs francophone, clair et bienveillant. But : faire "
+        "RAISONNER l'élève, pas mémoriser. On te fournit 4 indices factuels DÉJÀ "
+        "VÉRIFIÉS (corrects et centrés sur LA solution) et la ligne solution. Règles "
+        "absolues :\n"
+        "1. Tu REFORMULES ces indices en un raisonnement de coach fluide. N'affirme QUE "
+        "ce qui figure dans la base : n'invente aucun coup, pièce, case ni menace, et "
+        "ne mentionne PAS d'autres idées/attaques que celles de la base.\n"
+        "2. TUTOIE l'élève (tu, ton, te) — jamais de vouvoiement.\n"
+        "3. Français à 100 % ; thèmes en français (« fourchette », pas « fork ») ; "
+        "notation française des pièces R/D/T/F/C, jamais K/Q/R/B/N.\n"
+        "4. Respecte la PROGRESSION : indice 1 = orientation, ne révèle NI la case NI le "
+        "coup ; indice 2 = la faiblesse/le signal clé ; indice 3 = oriente vers la "
+        "case/le motif SANS donner le coup exact ; indice 4 = donne le 1er coup et "
+        "explique pourquoi il gagne (idée de la suite incluse).\n"
+        "5. Concis : 1 à 2 phrases par indice, sans préfixe (« Indice 1 : »…)."
     )
+    niveau = ("débutant : sois plus explicite et encourageant"
+              if target_elo and target_elo < 1200 else
+              "joueur confirmé : sois dense et précis")
     user = {
         "trait": side,
-        "niveau_cible_elo": target_elo,
-        "signaux_verifies": facts,
+        "niveau_eleve_elo": target_elo,
+        "adapter_au_niveau": niveau,
         "themes": themes_fr(themes),
+        "indices_factuels_verifies_a_reformuler": base,
         "solution_notation_francaise": sans,
-        "premier_coup_san": first_san,
-        "consigne": (
-            "Produis exactement 4 indices progressifs, du plus vague au plus précis, "
-            "adaptés au niveau cible. Indice 1 = nudge sans rien révéler. Indice 2 = "
-            "pointe le(s) signal(aux) clé(s). Indice 3 = oriente vers la case/pièce "
-            "sans donner le coup. Indice 4 = donne le premier coup et explique "
-            "pourquoi il marche. IMPORTANT : chaque indice est une phrase directe, "
-            "SANS préfixe du type 'Niveau 1 :' ou 'Indice 1 :' (l'interface les numérote "
-            "déjà). Reste concis (1 à 2 phrases par indice)."
-        ),
+        "consigne": "Réécris ces 4 indices en vrai coach (tutoiement), en respectant "
+                    "strictement la base et la progression ci-dessus.",
     }
     schema = {
         "type": "object",
@@ -208,7 +210,9 @@ def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[st
     variable d'env CHESS_COACH_LLM=on, ou ponctuellement via force_llm (tests).
     """
     pid = puzzle["id"]
-    env_on = os.environ.get("CHESS_COACH_LLM", "off").lower() in ("on", "1", "true", "yes")
+    # Narrateur Haiku ACTIVÉ par défaut ; mettre CHESS_COACH_LLM=off pour repasser
+    # aux gabarits (gratuit). Repli automatique sur gabarits si pas de clé / erreur API.
+    env_on = os.environ.get("CHESS_COACH_LLM", "on").lower() in ("on", "1", "true", "yes")
     llm_on = (env_on or force_llm) and bool(os.environ.get("ANTHROPIC_API_KEY"))
     ck = (pid, llm_on)
     if ck in _HINT_CACHE:
