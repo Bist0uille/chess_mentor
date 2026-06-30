@@ -340,11 +340,26 @@ function showHist(idx) {
 
 /* ---------- moteur : barre d'éval + réfutation ---------- */
 async function updateEval(fen) {
+  const fill = document.getElementById("evalfill");
+  const num = document.getElementById("evalnum");
+  // Positions terminales : le moteur renverrait « mate 0 » (→ barre à 0). On
+  // affiche directement le résultat à la place.
+  try {
+    const g = new Chess(fen);
+    if (g.game_over()) {
+      if (g.in_checkmate()) {
+        const whiteWon = g.turn() === "b";  // trait au camp maté
+        fill.style.height = whiteWon ? "100%" : "0%";
+        num.textContent = whiteWon ? "1–0" : "0–1";
+      } else {
+        fill.style.height = "50%"; num.textContent = "½–½";
+      }
+      return;
+    }
+  } catch (e) { /* fen invalide : on ignore */ }
   if (!engine.ok) return;
   const res = await engine.analyse(fen, 11);
   const ev = whiteEval(res);
-  const fill = document.getElementById("evalfill");
-  const num = document.getElementById("evalnum");
   if (!ev) return;
   let share;  // part des Blancs (0..100), 50 = égalité ; barre verticale (bas = Blancs)
   if (ev.mate != null) share = ev.mate > 0 ? 100 : 0;
