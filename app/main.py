@@ -103,6 +103,49 @@ def post_hint(req: HintReq):
     return {"level": lvl, "total_levels": len(hints), "hint": hints[lvl - 1]}
 
 
+@app.get("/api/diag")
+def diag():
+    """Diagnostic temporaire : pourquoi la narration Claude tombe en repli ?
+    N'expose JAMAIS la clé (seulement un booléen)."""
+    info = {"key_set": bool(os.environ.get("ANTHROPIC_API_KEY")), "model": coach.MODEL}
+    try:
+        import anthropic
+        info["anthropic_version"] = getattr(anthropic, "__version__", "?")
+    except Exception as e:
+        info["error_import"] = f"{type(e).__name__}: {e}"
+        return info
+    if not info["key_set"]:
+        info["error"] = "ANTHROPIC_API_KEY absente côté serveur"
+        return info
+    client = anthropic.Anthropic()
+    # 1) appel simple
+    try:
+        r = client.messages.create(
+            model=coach.MODEL, max_tokens=20,
+            messages=[{"role": "user", "content": "Réponds uniquement : OK"}],
+        )
+        info["basic_ok"] = True
+        info["basic_sample"] = next((b.text for b in r.content if b.type == "text"), "")
+    except Exception as e:
+        info["basic_ok"] = False
+        info["basic_error"] = f"{type(e).__name__}: {e}"
+    # 2) appel structuré (comme en prod)
+    try:
+        schema = {"type": "object", "properties": {"hints": {"type": "array",
+                  "items": {"type": "string"}}}, "required": ["hints"],
+                  "additionalProperties": False}
+        r = client.messages.create(
+            model=coach.MODEL, max_tokens=200,
+            messages=[{"role": "user", "content": "Donne 1 indice d'échecs en français."}],
+            output_config={"format": {"type": "json_schema", "schema": schema}},
+        )
+        info["structured_ok"] = True
+    except Exception as e:
+        info["structured_ok"] = False
+        info["structured_error"] = f"{type(e).__name__}: {e}"
+    return info
+
+
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC, "index.html"))
