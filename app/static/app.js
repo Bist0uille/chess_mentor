@@ -14,6 +14,7 @@ let annotStart = null;    // case de départ d'une flèche en cours
 let centers = {};         // case -> {x,y} en px relatifs à #board
 let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
+let loadedHints = null;   // les 4 indices, chargés en un seul appel
 
 function band() {
   const [lo, hi] = document.getElementById("level").value.split("-").map(Number);
@@ -49,7 +50,7 @@ async function loadPuzzle() {
   setStatus("Chargement…", "");
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
-  hintLevel = 0; ply = 0; solved = false; lastMove = [];
+  hintLevel = 0; ply = 0; solved = false; lastMove = []; loadedHints = null;
   clearSelection(); annotations = []; redrawAll();
   const b = band();
   const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
@@ -356,15 +357,20 @@ function drawAnnot() {
 /* ---------- indices & solution ---------- */
 async function nextHint() {
   if (!puzzle || solved) return;
-  if (hintLevel >= 4) { setStatus("Plus d'indices : à toi de conclure.", ""); return; }
+  if (!loadedHints) {
+    setStatus("Réflexion du coach…", "");
+    const r = await fetch(
+      `/api/hints?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}`);
+    loadedHints = (await r.json()).hints;
+    setStatus("", "");
+  }
+  if (hintLevel >= loadedHints.length) {
+    setStatus("Plus d'indices : à toi de conclure.", ""); return;
+  }
   hintLevel += 1;
-  const r = await fetch("/api/hint", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: puzzle.id, level: hintLevel, target_elo: band().elo }),
-  });
-  const data = await r.json();
   const li = document.createElement("li");
-  li.innerHTML = `<b>Indice ${data.level}/${data.total_levels} :</b> ${escapeHtml(data.hint)}`;
+  li.innerHTML = `<b>Indice ${hintLevel}/${loadedHints.length} :</b> ` +
+    escapeHtml(loadedHints[hintLevel - 1]);
   $hints.appendChild(li);
 }
 
