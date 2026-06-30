@@ -28,9 +28,10 @@
     }
     .brand b { color: var(--text); font-weight: 600; }
     #status {
-      font-size: 1.7rem; font-weight: 700; margin: 2px 0 16px; min-height: 1.4em;
+      font-size: 1.4rem; font-weight: 700; margin: 2px 0 12px; min-height: 0;
       letter-spacing: -.01em;
     }
+    #status:empty { margin: 0; }
     #status.ok { color: var(--green); }
     #status.ko { color: var(--red); }
 
@@ -133,7 +134,9 @@
 
     @media (max-width: 820px) {
       .grid { grid-template-columns: 1fr; gap: 18px; }
-      #status { font-size: 1.4rem; }
+      .left { width: 100%; }
+      .boardrow, .nav, .toolbar { justify-content: center; }  /* échiquier centré */
+      #status { font-size: 1.25rem; text-align: center; }
     }
   </style>
 </head>
@@ -141,7 +144,7 @@
   <div class="app">
     <div class="brand"><img src="/static/favicon.svg" alt="" width="26" height="26"
          style="display:block;border-radius:6px" /> <b>Chess Mentor</b></div>
-    <h1 id="status">À toi de jouer</h1>
+    <h1 id="status"></h1>
 
     <div class="grid">
       <section class="left">
@@ -164,7 +167,7 @@
         </div>
 
         <div class="toolbar">
-          <button id="hint" class="btn primary">Indice suivant</button>
+          <button id="hint" class="btn primary">Indice</button>
           <button id="new" class="btn">Nouveau puzzle</button>
           <button id="solution" class="btn">Voir la solution</button>
         </div>

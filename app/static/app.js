@@ -89,7 +89,7 @@ async function loadPuzzle() {
   });
   setupOverlay();
   updateProgress();
-  setStatus("À toi de jouer.", "");
+  setStatus("", "");
   updateEval(puzzle.fen);
   updateNav();
   renderMoveLog();
@@ -565,12 +565,14 @@ async function nextHint() {
     loadedHints = (await r.json()).hints;
     setStatus("", "");
   }
-  if (hintLevel >= loadedHints.length) {
-    setStatus("Plus d'indices : à toi de conclure.", ""); return;
+  const MAX = 3;  // on ne montre que 3 indices (le 4e révélait la solution)
+  if (hintLevel >= MAX) {
+    setStatus("Plus d'indices : à toi de jouer, ou « Voir la solution ».", "");
+    return;
   }
   hintLevel += 1;
   const li = document.createElement("li");
-  li.innerHTML = `<b>Indice ${hintLevel}/${loadedHints.length} :</b> ` +
+  li.innerHTML = `<b>Indice ${hintLevel}/${MAX} :</b> ` +
     escapeHtml(loadedHints[hintLevel - 1]);
   $hints.appendChild(li);
 }
