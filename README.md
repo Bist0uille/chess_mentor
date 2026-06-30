@@ -1,6 +1,6 @@
 # ♟️ Chess Mentor — coach de raisonnement
 
-**En ligne : https://chess-mentor-ten.vercel.app**
+### 👉 Démo en ligne : **https://chess-mentor-ten.vercel.app**
 
 Un coach d'échecs qui n'apprend pas à *mémoriser* des solutions, mais à
 **raisonner**. Au lieu de balancer le coup, il identifie les **signaux faibles**
@@ -61,15 +61,14 @@ Le projet est prêt pour Vercel (Python serverless) :
 
 ### Coût & sécurité (site public)
 
-Le projet ne stocke aucune donnée utilisateur et n'écrit rien (lecture seule). Aucun
-secret n'est dans le dépôt — la clé API vit uniquement dans les variables
-d'environnement de l'hébergeur.
-
-⚠️ **Si le narrateur LLM est activé sur un site public**, n'importe qui peut déclencher
-des appels (≈ 0,2 centime/problème), facturés sur ton compte Anthropic. Avant de publier :
-- définis une **limite de dépense** dans la console Anthropic (Settings → Limits) ;
-- ou laisse `CHESS_COACH_LLM=off` (indices-gabarits, 100 % gratuits) ;
-- il n'y a pas de limitation de débit intégrée — ajoute-en une si tu attends du trafic.
+- **Aucun secret dans le dépôt** : clé Anthropic et tokens Vercel KV vivent uniquement
+  dans les variables d'environnement de l'hébergeur (le `.gitignore` couvre `.env*`).
+- **Pas de compte ni de données personnelles** : la seule écriture est l'ajout des retours
+  volontaires (feedback) dans Vercel KV.
+- **Coût LLM maîtrisé** : la narration Haiku coûte ~0,2 centime/problème ; une **limite de
+  dépense** est définie côté console Anthropic (Settings → Limits) pour plafonner le risque.
+  À défaut, `CHESS_COACH_LLM=off` rend l'app 100 % gratuite (indices-gabarits).
+- Pas de limitation de débit intégrée — à ajouter si du trafic important est attendu.
 
 ## Retours utilisateurs (feedback)
 
