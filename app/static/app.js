@@ -268,7 +268,11 @@ function bindBoardEvents() {
     annotStart = null;
   });
 
-  window.addEventListener("resize", () => { computeCenters(); redrawAll(); });
+  window.addEventListener("resize", () => {
+    if (board) board.resize();   // l'échiquier s'adapte à la largeur
+    setupOverlay();              // recrée la surcouche SVG à la bonne taille
+    redrawAll();                 // redessine flèches / cases / dernier coup
+  });
 }
 
 function isLegalDest(from, to) {
@@ -310,10 +314,10 @@ async function updateEval(fen) {
   const fill = document.getElementById("evalfill");
   const num = document.getElementById("evalnum");
   if (!ev) return;
-  let share;  // part des Blancs (0..100), 50 = égalité
+  let share;  // part des Blancs (0..100), 50 = égalité ; barre verticale (bas = Blancs)
   if (ev.mate != null) share = ev.mate > 0 ? 100 : 0;
   else share = Math.max(2, Math.min(98, 50 + ev.cp / 16));
-  fill.style.width = share + "%";
+  fill.style.height = share + "%";
   num.textContent = formatEval(ev);
 }
 
