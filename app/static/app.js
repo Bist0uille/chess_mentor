@@ -82,7 +82,7 @@ async function loadPuzzle() {
   board = Chessboard("board", {
     position: puzzle.fen, orientation, draggable: true,
     pieceTheme: "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png",
-    onDrop, onDragStart,
+    onDrop, onDragStart, onSnapEnd,
   });
   setupOverlay();
   updateProgress();
@@ -109,7 +109,9 @@ function onDragStart(source) {
 }
 
 // Coup joué en mode exploration (analyse libre, sans validation contre la solution).
-function exploreMove(source, target) {
+// render=false quand le coup vient d'un glisser (chessboard a déjà bougé la pièce ;
+// la resync se fait dans onSnapEnd) ; render=true pour un clic-pour-jouer.
+function exploreMove(source, target, render) {
   const g = new Chess(history[histIdx].fen);
   const mv = g.move({ from: source, to: target, promotion: "q" });
   if (!mv) return false;
@@ -118,16 +120,21 @@ function exploreMove(source, target) {
   histIdx = history.length - 1;
   lastMove = [mv.from, mv.to];
   clearSelection(); clearRefute();
-  board.position(g.fen());
+  if (render) board.position(g.fen());
   drawLastMove(); updateEval(g.fen()); updateNav(); renderMoveLog();
   return true;
+}
+
+// Resync après un glisser en exploration (gère roque / prise en passant / promotion).
+function onSnapEnd() {
+  if (explore && board && history[histIdx]) board.position(history[histIdx].fen);
 }
 
 function onDrop(source, target) {
   // Clic simple (relâché sur la même case) : on GARDE la sélection et les points.
   if (source === target) return;
   clearSelection();
-  if (explore) { if (!exploreMove(source, target)) return "snapback"; return; }
+  if (explore) { if (!exploreMove(source, target, false)) return "snapback"; return; }
   if (!tryMove(source, target)) return "snapback";
 }
 
@@ -288,7 +295,7 @@ function bindBoardEvents() {
     if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
     if (selected && isLegalDest(selected, sq)) {
       const from = selected; clearSelection();
-      if (explore) exploreMove(from, sq); else tryMove(from, sq);
+      if (explore) exploreMove(from, sq, true); else tryMove(from, sq);
       return;
     }
     const cg = curChess();
