@@ -539,9 +539,8 @@ async function nextHint() {
   if (!puzzle || solved) return;
   if (!loadedHints) {
     setStatus("Réflexion du coach…", "");
-    const llm = new URLSearchParams(location.search).get("llm") ? "&llm=1" : "";
     const r = await fetch(
-      `/api/hints?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}${llm}`);
+      `/api/hints?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}`);
     loadedHints = (await r.json()).hints;
     setStatus("", "");
   }
