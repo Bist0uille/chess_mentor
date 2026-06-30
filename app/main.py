@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import coach, db
+from . import coach, db, explain
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -61,6 +61,14 @@ def post_attempt(a: Attempt):
     # Coup correct : on le joue, puis la réponse adverse s'il en reste une.
     board.push_uci(expected)
     result = {"correct": True, "next_ply": a.ply + 1}
+    # Explication du coup joué (et de la réponse adverse) — déterministe.
+    board0 = chess.Board(puz["fen"])
+    board0.push_uci(puz["moves"].split()[0])
+    notes = explain.line_notes(board0, solution)
+    parts = [notes[idx]] if idx < len(notes) else []
+    if idx + 1 < len(notes):
+        parts.append(notes[idx + 1])
+    result["explain"] = " ".join(parts)
     if idx + 1 < len(solution):
         reply = solution[idx + 1]
         reply_move = chess.Move.from_uci(reply)
@@ -89,7 +97,8 @@ def get_solution(id: str):
     if not puz:
         raise HTTPException(404, "Puzzle introuvable.")
     board, solution = coach.position_to_solve(puz["fen"], puz["moves"])
-    return {"uci": solution, "san": coach.solution_san_fr(board, solution)}
+    return {"uci": solution, "san": coach.solution_san_fr(board, solution),
+            "notes": explain.line_notes(board, solution)}
 
 
 @app.post("/api/hint")

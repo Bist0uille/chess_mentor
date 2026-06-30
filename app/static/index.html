@@ -97,6 +97,12 @@
     }
     .refute b { color: #ff8a80; }
 
+    .moveinfo {
+      background: #1f2e1a; border: 1px solid #34481f; border-left: 3px solid var(--green);
+      padding: 11px 14px; border-radius: 8px; font-size: .92rem; line-height: 1.5;
+    }
+    .moveinfo b { color: #9cc66f; }
+
     .linewrap { margin-top: 4px; }
     .linelabel { font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
     .line {
@@ -179,6 +185,7 @@
           coup faux et le moteur t'expliquera pourquoi il échoue.
         </p>
         <div id="refute" class="refute" style="display:none"></div>
+        <div id="moveinfo" class="moveinfo" style="display:none"></div>
         <ol class="hints" id="hints"></ol>
         <div id="lineWrap" class="linewrap" style="display:none">
           <div class="linelabel">Ligne solution</div>

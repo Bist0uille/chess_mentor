@@ -283,6 +283,20 @@ def _key_signal(board: chess.Board, sol_uci: List[str], ann: dict) -> str:
             f"gagnante.")
 
 
+def line_notes(board: chess.Board, sol_uci: List[str]) -> List[str]:
+    """Une phrase d'explication par demi-coup de la ligne (notation FR)."""
+    if not sol_uci:
+        return []
+    ann = annotate(board, sol_uci)
+    b = board.copy()
+    notes = []
+    for i, ply in enumerate(ann["plies"]):
+        mv = chess.Move.from_uci(sol_uci[i])
+        notes.append(_move_sentence(ply, b, mv))
+        b.push(mv)
+    return notes
+
+
 def build_hints(board: chess.Board, sol_uci: List[str], themes: str,
                 target_elo: int, signals=None) -> List[str]:
     """4 indices progressifs, centrés sur la solution."""

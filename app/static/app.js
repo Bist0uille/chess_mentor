@@ -63,7 +63,7 @@ async function loadPuzzle() {
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
   hintLevel = 0; ply = 0; solved = false; lastMove = []; loadedHints = null;
-  clearSelection(); annotations = []; clearRefute(); redrawAll();
+  clearSelection(); annotations = []; clearRefute(); showMoveInfo(""); redrawAll();
   const b = band();
   const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
@@ -74,7 +74,7 @@ async function loadPuzzle() {
   $meta.innerHTML = `Trait aux <b>${trait}</b> · rating ${puzzle.rating} · ` +
     `${puzzle.n_solver_moves} coup(s) à trouver`;
   $themes.innerHTML = `<b>Thèmes :</b> ${(puzzle.themes || []).join(", ") || "—"}`;
-  history = [{ fen: puzzle.fen, lastMove: [] }];
+  history = [{ fen: puzzle.fen, lastMove: [], explain: "" }];
   histIdx = 0;
   if (board) board.destroy();
   board = Chessboard("board", {
@@ -160,6 +160,7 @@ async function validate(uci) {
         ? "❌ Coup légal, mais ce n'est pas la solution. Réessaie."
         : "❌ Coup invalide.", "ko");
       board.position(game.fen());
+      showMoveInfo("");             // on cache l'explication du coup juste
       if (data.legal) refute(uci);  // le moteur explique pourquoi ça échoue
       return;
     }
@@ -173,9 +174,10 @@ async function validate(uci) {
     board.position(game.fen());
     drawLastMove();
     updateEval(game.fen());
-    history.push({ fen: game.fen(), lastMove: lastMove.slice() });
+    history.push({ fen: game.fen(), lastMove: lastMove.slice(), explain: data.explain || "" });
     histIdx = history.length - 1;
     updateNav();
+    showMoveInfo(data.explain || "");
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
@@ -336,6 +338,7 @@ function showHist(idx) {
   drawLastMove();
   updateEval(h.fen);
   updateNav();
+  showMoveInfo(h.explain || "");
 }
 
 /* ---------- moteur : barre d'éval + réfutation ---------- */
@@ -400,6 +403,17 @@ function clearRefute() {
   refuteMove = null;
   const $r = document.getElementById("refute");
   if ($r) $r.style.display = "none";
+}
+
+function showMoveInfo(text) {
+  const el = document.getElementById("moveinfo");
+  if (!el) return;
+  if (text) {
+    el.innerHTML = `<b>Pourquoi ce coup :</b> ${escapeHtml(text)}`;
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  }
 }
 
 function drawHints() {
@@ -506,11 +520,14 @@ async function showSolution() {
     $lineWrap.style.display = "block";
     // reconstruit l'historique complet depuis la position de départ
     const g = new Chess(puzzle.fen);
-    history = [{ fen: puzzle.fen, lastMove: [] }];
-    for (const uci of data.uci) {
+    history = [{ fen: puzzle.fen, lastMove: [], explain: "" }];
+    data.uci.forEach((uci, i) => {
       g.move(uciToObj(uci));
-      history.push({ fen: g.fen(), lastMove: [uci.slice(0, 2), uci.slice(2, 4)] });
-    }
+      history.push({
+        fen: g.fen(), lastMove: [uci.slice(0, 2), uci.slice(2, 4)],
+        explain: (data.notes && data.notes[i]) || "",
+      });
+    });
     // anime du début à la fin (puis navigable avec ⏮ ◀ ▶ ⏭)
     setStatus("Rejeu de la solution…", "");
     for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
