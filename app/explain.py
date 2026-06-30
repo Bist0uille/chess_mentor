@@ -68,6 +68,8 @@ def annotate(board: chess.Board, solution_uci: List[str]) -> dict:
     plies = []
     captured_by_me = 0
     captured_by_opp = 0
+    won_types = []   # pièces que JE capture
+    lost_types = []  # pièces que l'adversaire capture
 
     for i, uci in enumerate(solution_uci):
         move = chess.Move.from_uci(uci)
@@ -87,8 +89,12 @@ def annotate(board: chess.Board, solution_uci: List[str]) -> dict:
             val = PIECE_VALUE.get(cap_type, 0)
             if side_is_me:
                 captured_by_me += val
+                if cap_type:
+                    won_types.append(cap_type)
             else:
                 captured_by_opp += val
+                if cap_type:
+                    lost_types.append(cap_type)
         san_fr = _fr(b.san(move))
         was_check = b.is_check()  # le camp au trait était-il en échec avant ce coup ?
 
@@ -145,8 +151,27 @@ def annotate(board: chess.Board, solution_uci: List[str]) -> dict:
 
     return {
         "plies": plies, "outcome": outcome, "net_material": net,
+        "result": _material_result(won_types, lost_types),
         "threat": threat, "n_solver_moves": (len(solution_uci) + 1) // 2,
     }
+
+
+def _material_result(won, lost):
+    """Décrit le bilan d'un échange en termes d'échecs (dame, qualité, pièce…).
+    net = points gagnés (pion 1, mineure 3, tour 5, dame 9)."""
+    net = sum(PIECE_VALUE[t] for t in won) - sum(PIECE_VALUE[t] for t in lost)
+    if net <= 0:
+        return None
+    minors = (chess.KNIGHT, chess.BISHOP)
+    # gain net de la dame contre la tour (Q pour R) — cas fréquent
+    if net == 4 and chess.QUEEN in won and chess.ROOK in lost:
+        return "la dame contre la tour"
+    # la qualité : on prend une tour en cédant une pièce mineure
+    if net == 2 and chess.ROOK in won and any(t in lost for t in minors):
+        return "la qualité"
+    table = {1: "un pion", 2: "deux pions", 3: "une pièce", 4: "une pièce et un pion",
+             5: "une tour", 6: "une tour et un pion", 9: "la dame"}
+    return table.get(net, f"environ {net} points de matériel")
 
 
 def _threat_after(board: chess.Board, first_uci: str):
@@ -294,6 +319,12 @@ def line_notes(board: chess.Board, sol_uci: List[str]) -> List[str]:
         mv = chess.Move.from_uci(sol_uci[i])
         notes.append(_move_sentence(ply, b, mv))
         b.push(mv)
+    # bilan de l'échange ajouté au dernier coup du solveur (sauf si c'est un mat)
+    if ann.get("result") and ann["outcome"] != "mate":
+        for i in range(len(ann["plies"]) - 1, -1, -1):
+            if ann["plies"][i]["me"]:
+                notes[i] += f" Bilan : tu gagnes {ann['result']}."
+                break
     return notes
 
 
@@ -345,9 +376,8 @@ def build_hints(board: chess.Board, sol_uci: List[str], themes: str,
         mv = chess.Move.from_uci(sol_uci[ply["i"]])
         sentences.append(_move_sentence(ply, b, mv))
         b.push(mv)
-    if ann["outcome"] == "win_material" and ann["net_material"] > 0:
-        sentences.append(f"Bilan : tu gagnes l'équivalent de "
-                         f"{ann['net_material']} point(s) de matériel.")
+    if ann["outcome"] != "mate" and ann.get("result"):
+        sentences.append(f"Bilan : tu gagnes {ann['result']}.")
     h4 = "Solution. " + " ".join(sentences)
 
     # Petite adaptation au niveau : un mot d'encouragement pour les débutants.
