@@ -50,12 +50,20 @@ class Engine {
   }
 }
 
-/** Score (cp/mate, relatif au trait) → nombre du point de vue des Blancs. */
+/** Score (cp/mate, relatif au trait) → point de vue des Blancs.
+ *  Convention Lozza : « mate N » = mat en N+1 ; N >= 0 ⇒ le trait gagne. */
 function whiteEval(res) {
   if (!res) return null;
-  const sign = res.stm === "w" ? 1 : -1;
-  if (res.mate != null) return { mate: sign * res.mate };
-  if (res.cp != null) return { cp: sign * res.cp };
+  if (res.mate != null) {
+    const stmWins = res.mate >= 0;                       // le camp au trait mate
+    const whiteWins = (res.stm === "w") === stmWins;
+    const dist = Math.abs(res.mate) + 1;                 // mate 0 → mat en 1
+    return { mate: whiteWins ? dist : -dist };
+  }
+  if (res.cp != null) {
+    const sign = res.stm === "w" ? 1 : -1;
+    return { cp: sign * res.cp };
+  }
   return null;
 }
 
