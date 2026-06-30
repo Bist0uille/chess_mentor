@@ -191,9 +191,7 @@ async function validate(uci) {
     });
     const data = await r.json();
     if (!data.correct) {
-      setStatus(data.legal
-        ? "❌ Coup légal, mais ce n'est pas la solution. Réessaie."
-        : "❌ Coup invalide.", "ko");
+      setStatus(data.legal ? "❌ Pas la solution, réessaie." : "❌ Coup invalide.", "ko");
       board.position(game.fen());
       if (data.legal) refute(uci);  // le moteur explique pourquoi ça échoue
       return;
@@ -216,12 +214,12 @@ async function validate(uci) {
     updateProgress();
     if (data.done) {
       solved = true; explore = true;  // exploration libre de la suite
-      setStatus("✅ Résolu ! Tu peux continuer à bouger les pièces pour explorer.", "ok");
+      setStatus("✅ Résolu ! Tu peux explorer la suite.", "ok");
       if (data.line_san) { $line.textContent = data.line_san.join("  ");
                            $lineWrap.style.display = "block"; }
     } else {
-      const rep = data.opponent_san ? ` L'adversaire répond ${data.opponent_san}.` : "";
-      setStatus(`✅ Bon coup !${rep} Continue.`, "ok");
+      const rep = data.opponent_san ? ` Réponse : ${data.opponent_san}.` : "";
+      setStatus(`✅ Bon coup !${rep}`, "ok");
     }
   } finally { busy = false; }
 }
@@ -566,7 +564,7 @@ async function nextHint() {
   }
   const MAX = 3;  // on ne montre que 3 indices (le 4e révélait la solution)
   if (hintLevel >= MAX) {
-    setStatus("Plus d'indices : à toi de jouer, ou « Voir la solution ».", "");
+    setStatus("Plus d'indices — à toi de jouer.", "");
     return;
   }
   hintLevel += 1;
@@ -598,7 +596,7 @@ async function showSolution() {
     setStatus("Rejeu de la solution…", "");
     for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
     explore = true;  // exploration libre après le rejeu
-    setStatus("Solution rejouée. Tu peux continuer à bouger les pièces.", "ok");
+    setStatus("Solution rejouée — explore librement.", "ok");
   } finally { busy = false; }
 }
 

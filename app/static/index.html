@@ -25,14 +25,14 @@
     .brand {
       font-size: 1.7rem; color: var(--text); letter-spacing: -.01em;
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      margin: 6px 0 34px;
+      margin: 6px 0 8px;
     }
     .brand b { color: var(--text); font-weight: 700; }
     #status {
-      font-size: 1.4rem; font-weight: 700; margin: 2px 0 12px; min-height: 0;
-      letter-spacing: -.01em;
+      font-size: 1.3rem; font-weight: 700; margin: 2px 0 10px;
+      min-height: 2.4em;          /* place réservée : le texte n'décale pas l'échiquier */
+      display: flex; align-items: center; letter-spacing: -.01em;
     }
-    #status:empty { margin: 0; }
     #status.ok { color: var(--green); }
     #status.ko { color: var(--red); }
 
@@ -144,7 +144,7 @@
       #board { width: min(480px, 92vw); }         /* échiquier plein, centré */
       .controls, .level { width: 100%; }
       .level { justify-content: center; }
-      #status { font-size: 1.25rem; text-align: center; }
+      #status { font-size: 1.2rem; justify-content: center; text-align: center; }
     }
   </style>
 </head>
