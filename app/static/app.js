@@ -125,6 +125,7 @@ function exploreMove(source, target, render) {
   clearSelection(); clearRefute();
   if (render) board.position(g.fen());
   drawLastMove(); updateEval(g.fen()); updateNav(); renderMoveLog();
+  showBestReply(g.fen());   // meilleure réponse du moteur (voir si le coup tient)
   return true;
 }
 
@@ -370,6 +371,7 @@ function showHist(idx) {
   histIdx = Math.max(0, Math.min(idx, history.length - 1));
   const h = history[histIdx];
   clearSelection();
+  clearRefute();              // efface l'analyse précédente en naviguant
   board.position(h.fen);
   lastMove = h.lastMove.slice();
   drawLastMove();
@@ -439,7 +441,26 @@ async function refute(uci) {
 function clearRefute() {
   refuteMove = null;
   const $r = document.getElementById("refute");
-  if ($r) $r.style.display = "none";
+  if ($r) { $r.style.display = "none"; $r.className = "refute"; }
+}
+
+// Analyse d'exploration : affiche la meilleure réponse du moteur à la position
+// courante (coup + éval + flèche), pour voir si le coup joué tient ou est réfuté.
+async function showBestReply(fen) {
+  if (!engine.ok) return;
+  const res = await engine.analyse(fen, 14);
+  if (!res || !res.bestmove) return;
+  const g = new Chess(fen);
+  const mv = g.move(uciToObj(res.bestmove));
+  const ev = whiteEval(res);
+  const $r = document.getElementById("refute");
+  $r.className = "refute analysis";
+  $r.innerHTML = `<b>Meilleure réponse du moteur :</b> ` +
+    `${escapeHtml(mv ? frSan(mv.san) : res.bestmove)}` +
+    (ev ? ` — éval ${formatEval(ev)} (point de vue des Blancs)` : "");
+  $r.style.display = "block";
+  refuteMove = { from: res.bestmove.slice(0, 2), to: res.bestmove.slice(2, 4) };
+  drawAnnot();
 }
 
 function renderMoveLog() {
