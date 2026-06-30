@@ -74,6 +74,8 @@ function onDragStart(source) {
 }
 
 function onDrop(source, target) {
+  // Clic simple (relâché sur la même case) : on GARDE la sélection et les points.
+  if (source === target) return;
   clearSelection();
   if (!tryMove(source, target)) return "snapback";
 }
@@ -182,6 +184,7 @@ function bindBoardEvents() {
     if (annotations.length) { annotations = []; drawAnnot(); }
     const sq = squareFromEvent(e);
     if (!sq) { clearSelection(); return; }
+    if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
     if (selected && isLegalDest(selected, sq)) {
       const from = selected; clearSelection(); tryMove(from, sq);
       return;
