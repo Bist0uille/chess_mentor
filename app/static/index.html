@@ -30,8 +30,8 @@
     #status.ok { color: var(--green); }
     #status.ko { color: var(--red); }
 
-    .grid { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: start; }
-    .left { display: flex; flex-direction: column; gap: 12px; }
+    .grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 26px; align-items: start; }
+    .left { width: min(480px, 100%); display: flex; flex-direction: column; gap: 12px; }
 
     .meta { font-size: .92rem; color: var(--muted); }
     .meta b { color: var(--text); }
@@ -68,6 +68,17 @@
       padding: 7px 9px; border-radius: 8px; background: var(--panel); color: var(--text);
       border: 1px solid var(--border);
     }
+
+    .nav { display: flex; gap: 6px; }
+    .navbtn {
+      padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 1rem;
+      border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    }
+    .navbtn:hover:not(:disabled) { border-color: var(--green); }
+    .navbtn:disabled { opacity: .35; cursor: default; }
+
+    .themes { font-size: .82rem; color: var(--muted); line-height: 1.55; }
+    .themes b { color: var(--text); }
 
     .panel { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
     .intro { color: var(--muted); font-size: .9rem; margin: 4px 0 2px; line-height: 1.5; }
@@ -129,6 +140,13 @@
           <div id="board"></div>
         </div>
 
+        <div class="nav">
+          <button id="navStart" class="navbtn" title="Position de départ">⏮</button>
+          <button id="navPrev" class="navbtn" title="Coup précédent">◀</button>
+          <button id="navNext" class="navbtn" title="Coup suivant">▶</button>
+          <button id="navEnd" class="navbtn" title="Dernière position">⏭</button>
+        </div>
+
         <div class="toolbar">
           <button id="hint" class="btn primary">Indice suivant</button>
           <button id="new" class="btn">Nouveau puzzle</button>
@@ -142,6 +160,8 @@
             <option value="1800-2200">Expert (1800–2200)</option>
           </select>
         </label>
+
+        <div class="themes" id="themes"></div>
 
         <div id="promo" class="promo">
           <div class="plabel">Promotion :</div>

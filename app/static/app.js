@@ -16,6 +16,8 @@ let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
 let loadedHints = null;   // les 4 indices, chargés en un seul appel
 let refuteMove = null;    // flèche de réfutation (coup du moteur)
+let history = [];         // positions [{fen, lastMove}] pour le navigateur
+let histIdx = 0;          // index courant dans l'historique
 
 const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
 const REFUTE_COLOR = "rgba(179,38,30,0.85)";
@@ -40,6 +42,7 @@ const $progress = document.getElementById("progress");
 const $lineWrap = document.getElementById("lineWrap");
 const $line = document.getElementById("line");
 const $boardEl = document.getElementById("board");
+const $themes = document.getElementById("themes");
 
 function setStatus(msg, cls) { $status.textContent = msg; $status.className = cls || ""; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -69,8 +72,10 @@ async function loadPuzzle() {
   const orientation = puzzle.side_to_move === "w" ? "white" : "black";
   const trait = puzzle.side_to_move === "w" ? "Blancs" : "Noirs";
   $meta.innerHTML = `Trait aux <b>${trait}</b> · rating ${puzzle.rating} · ` +
-    `${puzzle.n_solver_moves} coup(s) à trouver · ` +
-    `thèmes : ${(puzzle.themes || []).join(", ") || "—"}`;
+    `${puzzle.n_solver_moves} coup(s) à trouver`;
+  $themes.innerHTML = `<b>Thèmes :</b> ${(puzzle.themes || []).join(", ") || "—"}`;
+  history = [{ fen: puzzle.fen, lastMove: [] }];
+  histIdx = 0;
   if (board) board.destroy();
   board = Chessboard("board", {
     position: puzzle.fen, orientation, draggable: true,
@@ -81,11 +86,14 @@ async function loadPuzzle() {
   updateProgress();
   setStatus("À toi de jouer.", "");
   updateEval(puzzle.fen);
+  updateNav();
 }
 
 /* ---------- coups (drag + clic) ---------- */
+function reviewing() { return histIdx !== history.length - 1; }
+
 function onDragStart(source) {
-  if (solved || busy) return false;
+  if (solved || busy || reviewing()) return false;
   // n'autorise à saisir que les pièces du camp au trait
   const piece = game.get(source);
   return piece && piece.color === game.turn();
@@ -165,6 +173,9 @@ async function validate(uci) {
     board.position(game.fen());
     drawLastMove();
     updateEval(game.fen());
+    history.push({ fen: game.fen(), lastMove: lastMove.slice() });
+    histIdx = history.length - 1;
+    updateNav();
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
@@ -245,6 +256,7 @@ function bindBoardEvents() {
   $boardEl.addEventListener("mousedown", e => {
     if (e.button !== 0) return;
     if (annotations.length || refuteMove) { annotations = []; refuteMove = null; drawAnnot(); }
+    if (reviewing()) { clearSelection(); return; }  // pas de jeu en mode revue
     const sq = squareFromEvent(e);
     if (!sq) { clearSelection(); return; }
     if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
@@ -304,6 +316,26 @@ function drawLastMove() {
   if (!g) return;
   g.innerHTML = "";
   for (const sq of lastMove) rectHighlight(g, sq, "rgba(255,221,0,0.32)");
+}
+
+/* ---------- navigateur de position (⏮ ◀ ▶ ⏭) ---------- */
+function updateNav() {
+  const atStart = histIdx <= 0, atEnd = histIdx >= history.length - 1;
+  const set = (id, dis) => { const b = document.getElementById(id); if (b) b.disabled = dis; };
+  set("navStart", atStart); set("navPrev", atStart);
+  set("navNext", atEnd); set("navEnd", atEnd);
+}
+
+function showHist(idx) {
+  if (!board || !history.length) return;
+  histIdx = Math.max(0, Math.min(idx, history.length - 1));
+  const h = history[histIdx];
+  clearSelection();
+  board.position(h.fen);
+  lastMove = h.lastMove.slice();
+  drawLastMove();
+  updateEval(h.fen);
+  updateNav();
 }
 
 /* ---------- moteur : barre d'éval + réfutation ---------- */
@@ -451,18 +483,22 @@ async function nextHint() {
 
 async function showSolution() {
   if (!puzzle || busy) return;
-  busy = true; solved = true; clearSelection();
+  busy = true; solved = true; clearSelection(); clearRefute();
   try {
     const r = await fetch(`/api/solution?id=${encodeURIComponent(puzzle.id)}`);
     const data = await r.json();
     $line.textContent = data.san.join("  ");
     $lineWrap.style.display = "block";
-    setStatus("Rejeu de la solution…", "");
+    // reconstruit l'historique complet depuis la position de départ
     const g = new Chess(puzzle.fen);
-    board.position(puzzle.fen); await sleep(500);
+    history = [{ fen: puzzle.fen, lastMove: [] }];
     for (const uci of data.uci) {
-      g.move(uciToObj(uci)); board.position(g.fen()); await sleep(650);
+      g.move(uciToObj(uci));
+      history.push({ fen: g.fen(), lastMove: [uci.slice(0, 2), uci.slice(2, 4)] });
     }
+    // anime du début à la fin (puis navigable avec ⏮ ◀ ▶ ⏭)
+    setStatus("Rejeu de la solution…", "");
+    for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
     setStatus("Solution rejouée.", "ok");
   } finally { busy = false; }
 }
@@ -474,5 +510,14 @@ function escapeHtml(s) {
 document.getElementById("new").onclick = loadPuzzle;
 document.getElementById("hint").onclick = nextHint;
 document.getElementById("solution").onclick = showSolution;
+document.getElementById("navStart").onclick = () => showHist(0);
+document.getElementById("navPrev").onclick = () => showHist(histIdx - 1);
+document.getElementById("navNext").onclick = () => showHist(histIdx + 1);
+document.getElementById("navEnd").onclick = () => showHist(history.length - 1);
+window.addEventListener("keydown", e => {
+  if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); showHist(histIdx - 1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); showHist(histIdx + 1); }
+});
 
 loadPuzzle();
