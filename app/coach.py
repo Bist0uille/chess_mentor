@@ -201,21 +201,25 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     return hints[:4]
 
 
-def get_hints(puzzle: dict, target_elo: int) -> List[str]:
-    """Renvoie les 4 indices pour un puzzle (avec cache)."""
+def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[str]:
+    """Renvoie les 4 indices pour un puzzle (avec cache).
+
+    Narrateur Claude désactivé par défaut (économie de tokens) : activé via la
+    variable d'env CHESS_COACH_LLM=on, ou ponctuellement via force_llm (tests).
+    """
     pid = puzzle["id"]
-    if pid in _HINT_CACHE:
-        return _HINT_CACHE[pid]
+    env_on = os.environ.get("CHESS_COACH_LLM", "off").lower() in ("on", "1", "true", "yes")
+    llm_on = (env_on or force_llm) and bool(os.environ.get("ANTHROPIC_API_KEY"))
+    ck = (pid, llm_on)
+    if ck in _HINT_CACHE:
+        return _HINT_CACHE[ck]
 
     board, sol_uci = position_to_solve(puzzle["fen"], puzzle["moves"])
     signals = sd.detect_all(board)
     sans = solution_san_fr(board, sol_uci)  # notation française pour l'affichage
     themes = puzzle.get("themes", "") or ""
 
-    # Narrateur Claude désactivé par défaut (économie de tokens).
-    # Pour l'activer : variable d'env CHESS_COACH_LLM=on (+ ANTHROPIC_API_KEY).
-    llm_on = os.environ.get("CHESS_COACH_LLM", "off").lower() in ("on", "1", "true", "yes")
-    if llm_on and os.environ.get("ANTHROPIC_API_KEY"):
+    if llm_on:
         try:
             hints = _claude_hints(board, signals, sans, sol_uci, themes, target_elo)
         except Exception as e:  # repli robuste si l'API échoue
@@ -224,5 +228,5 @@ def get_hints(puzzle: dict, target_elo: int) -> List[str]:
     else:
         hints = explain.build_hints(board, sol_uci, themes, target_elo, signals)
 
-    _HINT_CACHE[pid] = hints
+    _HINT_CACHE[ck] = hints
     return hints

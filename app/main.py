@@ -115,13 +115,14 @@ def post_hint(req: HintReq):
 
 
 @app.get("/api/hints")
-def get_all_hints(id: str, target_elo: int | None = None):
-    """Les 4 indices en un seul appel (1 seule requête Claude par puzzle)."""
+def get_all_hints(id: str, target_elo: int | None = None, llm: int = 0):
+    """Les 4 indices en un seul appel (1 seule requête Claude par puzzle).
+    llm=1 force le narrateur (tests/captures) si une clé est disponible."""
     puz = db.get_puzzle(id)
     if not puz:
         raise HTTPException(404, "Puzzle introuvable.")
     target = target_elo or puz["rating"]
-    return {"hints": coach.get_hints(puz, target)}
+    return {"hints": coach.get_hints(puz, target, force_llm=bool(llm))}
 
 
 @app.get("/api/diag")
