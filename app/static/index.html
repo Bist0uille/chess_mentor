@@ -135,6 +135,39 @@
     }
     .promo button:hover { border-color: var(--green); }
 
+    .fbopen {
+      margin-top: 16px; align-self: flex-start; background: none; color: var(--muted);
+      border: 1px solid var(--border); padding: 7px 12px; border-radius: 8px;
+      cursor: pointer; font-size: .85rem;
+    }
+    .fbopen:hover { border-color: var(--green); color: var(--text); }
+    .modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50; padding: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px;
+    }
+    .modal-title { font-weight: 700; font-size: 1.1rem; }
+    .fbvotes { display: flex; gap: 8px; }
+    .fbvote {
+      font-size: 1.3rem; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .fbvote.sel { border-color: var(--green); background: #20301c; }
+    .modal textarea {
+      width: 100%; resize: vertical; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: inherit;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .fbbtn {
+      padding: 8px 16px; border-radius: 8px; cursor: pointer; color: var(--text);
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .fbbtn.primary { background: var(--green); border-color: var(--green); }
+    .fbthanks { color: var(--green); font-weight: 600; text-align: center; }
+
     @media (max-width: 820px) {
       .app { padding: 14px 12px 36px; }
       .grid { grid-template-columns: 1fr; gap: 16px; }
@@ -190,6 +223,8 @@
 
         <div class="themes" id="themes"></div>
 
+        <button id="fbOpen" class="fbopen" type="button">💬 Un retour ?</button>
+
         <div id="promo" class="promo">
           <div class="plabel">Promotion :</div>
           <button data-p="q">♛ Dame</button>
@@ -208,6 +243,22 @@
           <div class="line" id="line"></div>
         </div>
       </section>
+    </div>
+  </div>
+
+  <div id="fbModal" class="modal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-title">Ton retour</div>
+      <div class="fbvotes">
+        <button id="fbUp" class="fbvote" type="button" data-v="up" title="J'aime">👍</button>
+        <button id="fbDown" class="fbvote" type="button" data-v="down" title="À améliorer">👎</button>
+      </div>
+      <textarea id="fbText" rows="4" placeholder="Une remarque, un bug, une idée d'amélioration…"></textarea>
+      <div class="modal-actions">
+        <button id="fbCancel" class="fbbtn" type="button">Annuler</button>
+        <button id="fbSend" class="fbbtn primary" type="button">Envoyer</button>
+      </div>
+      <div id="fbThanks" class="fbthanks" style="display:none">Merci ! 🙏</div>
     </div>
   </div>
 

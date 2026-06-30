@@ -611,6 +611,54 @@ document.getElementById("navStart").onclick = () => showHist(0);
 document.getElementById("navPrev").onclick = () => showHist(histIdx - 1);
 document.getElementById("navNext").onclick = () => showHist(histIdx + 1);
 document.getElementById("navEnd").onclick = () => showHist(history.length - 1);
+
+// --- Retour utilisateur (feedback) ---
+(function () {
+  const modal = document.getElementById("fbModal");
+  const txt = document.getElementById("fbText");
+  const up = document.getElementById("fbUp");
+  const down = document.getElementById("fbDown");
+  const thanks = document.getElementById("fbThanks");
+  const send = document.getElementById("fbSend");
+  let vote = null;
+  function setVote(v) {
+    vote = (vote === v) ? null : v;
+    up.classList.toggle("sel", vote === "up");
+    down.classList.toggle("sel", vote === "down");
+  }
+  function open() {
+    vote = null; txt.value = "";
+    up.classList.remove("sel"); down.classList.remove("sel");
+    thanks.style.display = "none"; send.disabled = false;
+    modal.style.display = "flex"; txt.focus();
+  }
+  function close() { modal.style.display = "none"; }
+  document.getElementById("fbOpen").onclick = open;
+  document.getElementById("fbCancel").onclick = close;
+  up.onclick = () => setVote("up");
+  down.onclick = () => setVote("down");
+  modal.addEventListener("mousedown", e => { if (e.target === modal) close(); });
+  send.onclick = async () => {
+    const text = txt.value.trim();
+    if (!text && !vote) { txt.focus(); return; }
+    send.disabled = true;
+    const sel = document.getElementById("level");
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text, vote,
+          puzzle_id: puzzle && puzzle.id,
+          level: sel.options[sel.selectedIndex].text,
+        }),
+      });
+    } catch (e) { /* on remercie quand même */ }
+    thanks.style.display = "block";
+    setTimeout(close, 900);
+  };
+})();
+
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
   if (e.key === "ArrowLeft") { e.preventDefault(); showHist(histIdx - 1); }

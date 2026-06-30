@@ -1,13 +1,15 @@
 """API FastAPI du coach d'échecs."""
+import html
 import os
+from datetime import datetime, timezone
 
 import chess
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import coach, db, explain
+from . import coach, db, explain, store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -122,6 +124,63 @@ def get_all_hints(id: str, target_elo: int | None = None):
         raise HTTPException(404, "Puzzle introuvable.")
     target = target_elo or puz["rating"]
     return {"hints": coach.get_hints(puz, target)}
+
+
+class Feedback(BaseModel):
+    text: str = ""
+    vote: str | None = None          # "up" | "down" | None
+    puzzle_id: str | None = None
+    level: str | None = None
+
+
+@app.post("/api/feedback")
+def post_feedback(fb: Feedback, request: Request):
+    """Enregistre un retour utilisateur (texte + vote + contexte) dans Vercel KV."""
+    text = (fb.text or "").strip()[:2000]
+    vote = fb.vote if fb.vote in ("up", "down") else None
+    if not text and not vote:
+        raise HTTPException(400, "Retour vide.")
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "text": text,
+        "vote": vote,
+        "puzzle_id": (fb.puzzle_id or "")[:32],
+        "level": (fb.level or "")[:32],
+        "ua": (request.headers.get("user-agent") or "")[:200],
+    }
+    stored = store.push_feedback(record)
+    if not stored:
+        print(f"[feedback] (KV désactivé) {record}")
+    return {"ok": True, "stored": stored}
+
+
+@app.get("/api/feedback/list", response_class=HTMLResponse)
+def list_feedback(key: str = ""):
+    """Page admin : liste des retours. Protégée par FEEDBACK_ADMIN_KEY."""
+    admin = os.environ.get("FEEDBACK_ADMIN_KEY")
+    if not admin or key != admin:
+        raise HTTPException(403, "Accès refusé.")
+    items = store.list_feedback()
+    note = "" if store.kv_enabled() else "<p>⚠️ Vercel KV non configuré : aucun retour stocké.</p>"
+    rows = "".join(
+        "<tr>"
+        f"<td>{html.escape(it.get('ts', ''))}</td>"
+        f"<td style='text-align:center'>{'👍' if it.get('vote') == 'up' else '👎' if it.get('vote') == 'down' else ''}</td>"
+        f"<td>{html.escape(it.get('puzzle_id', ''))}</td>"
+        f"<td>{html.escape(it.get('level', ''))}</td>"
+        f"<td>{html.escape(it.get('text', ''))}</td>"
+        "</tr>"
+        for it in items
+    ) or "<tr><td colspan='5'>Aucun retour pour l'instant.</td></tr>"
+    return (
+        "<!doctype html><meta charset='utf-8'><title>Retours — Chess Mentor</title>"
+        "<style>body{font:14px system-ui;background:#161616;color:#eee;padding:24px}"
+        "table{border-collapse:collapse;width:100%}th,td{border:1px solid #333;padding:8px;"
+        "text-align:left;vertical-align:top}th{background:#222}tr:nth-child(even){background:#1d1d1d}</style>"
+        f"<h1>Retours ({len(items)})</h1>{note}"
+        "<table><tr><th>Date (UTC)</th><th>Vote</th><th>Puzzle</th><th>Niveau</th><th>Message</th></tr>"
+        f"{rows}</table>"
+    )
 
 
 @app.get("/")

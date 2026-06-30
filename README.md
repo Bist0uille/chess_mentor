@@ -71,6 +71,20 @@ des appels (≈ 0,2 centime/problème), facturés sur ton compte Anthropic. Avan
 - ou laisse `CHESS_COACH_LLM=off` (indices-gabarits, 100 % gratuits) ;
 - il n'y a pas de limitation de débit intégrée — ajoute-en une si tu attends du trafic.
 
+## Retours utilisateurs (feedback)
+
+Un bouton « 💬 Un retour ? » ouvre une petite fenêtre (texte libre + vote 👍/👎). Les retours
+sont stockés dans **Vercel KV** (Upstash Redis) avec le contexte (id du puzzle, niveau, date).
+
+Mise en place :
+1. Vercel → **Storage → Create Database → KV** → connecte-la au projet (les variables
+   `KV_REST_API_URL` / `KV_REST_API_TOKEN` sont injectées automatiquement).
+2. Ajoute la variable d'env **`FEEDBACK_ADMIN_KEY`** = un mot de passe de ton choix.
+3. Redeploy.
+
+Lecture des retours : ouvre **`/api/feedback/list?key=<FEEDBACK_ADMIN_KEY>`** (page protégée).
+Sans KV configuré, l'envoi ne plante pas : le retour est simplement journalisé (logs Vercel).
+
 ## Tests
 
 Suite automatique (locale) : backend pytest + E2E navigateur (Playwright) + unitaire JS.
