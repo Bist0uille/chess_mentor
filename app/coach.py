@@ -156,10 +156,12 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
         "premier_coup_san": first_san,
         "consigne": (
             "Produis exactement 4 indices progressifs, du plus vague au plus précis, "
-            "adaptés au niveau cible. Niveau 1 = nudge sans rien révéler. Niveau 2 = "
-            "pointe le(s) signal(aux) clé(s). Niveau 3 = oriente vers la case/pièce "
-            "sans donner le coup. Niveau 4 = donne le premier coup et explique "
-            "pourquoi il marche."
+            "adaptés au niveau cible. Indice 1 = nudge sans rien révéler. Indice 2 = "
+            "pointe le(s) signal(aux) clé(s). Indice 3 = oriente vers la case/pièce "
+            "sans donner le coup. Indice 4 = donne le premier coup et explique "
+            "pourquoi il marche. IMPORTANT : chaque indice est une phrase directe, "
+            "SANS préfixe du type 'Niveau 1 :' ou 'Indice 1 :' (l'interface les numérote "
+            "déjà). Reste concis (1 à 2 phrases par indice)."
         ),
     }
     schema = {
