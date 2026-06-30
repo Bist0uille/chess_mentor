@@ -64,9 +64,14 @@ def to_french_san(san: str) -> str:
     return san.translate(_SAN_FR)
 
 
+# Thèmes peu informatifs (présents sur presque tous les puzzles) : on les cache.
+_THEME_HIDE = {"crushing"}
+
+
 def themes_fr(themes: str) -> list:
-    """Thèmes Lichess (chaîne) -> liste de libellés français (inconnus ignorés)."""
-    return [THEME_FR[t] for t in (themes or "").split() if t in THEME_FR]
+    """Thèmes Lichess (chaîne) -> libellés français (inconnus et bruyants ignorés)."""
+    return [THEME_FR[t] for t in (themes or "").split()
+            if t in THEME_FR and t not in _THEME_HIDE]
 
 
 def position_to_solve(fen: str, moves_uci: str):
