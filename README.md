@@ -2,6 +2,10 @@
 
 ### 👉 Démo en ligne : **https://chess-mentor-ten.vercel.app**
 
+<p align="center">
+  <img src="docs/screen_chess_mentor.jpeg" alt="Chess Mentor — capture d'écran" width="340">
+</p>
+
 Un coach d'échecs qui n'apprend pas à *mémoriser* des solutions, mais à
 **raisonner**. Au lieu de balancer le coup, il identifie les **signaux faibles**
 d'une position (roi sans case de fuite, pièce non défendue, pièces alignées,
