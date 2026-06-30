@@ -16,8 +16,9 @@ let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
 let loadedHints = null;   // les 4 indices, chargés en un seul appel
 let refuteMove = null;    // flèche de réfutation (coup du moteur)
-let history = [];         // positions [{fen, lastMove}] pour le navigateur
+let history = [];         // positions [{fen, lastMove, explain}] pour le navigateur
 let histIdx = 0;          // index courant dans l'historique
+let explore = false;      // mode exploration libre (après résolution)
 
 const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
 const REFUTE_COLOR = "rgba(179,38,30,0.85)";
@@ -62,7 +63,7 @@ async function loadPuzzle() {
   setStatus("Chargement…", "");
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
-  hintLevel = 0; ply = 0; solved = false; lastMove = []; loadedHints = null;
+  hintLevel = 0; ply = 0; solved = false; explore = false; lastMove = []; loadedHints = null;
   clearSelection(); annotations = []; clearRefute(); redrawAll();
   document.getElementById("movelog").style.display = "none";
   const b = band();
@@ -94,17 +95,39 @@ async function loadPuzzle() {
 /* ---------- coups (drag + clic) ---------- */
 function reviewing() { return histIdx !== history.length - 1; }
 
+// Position chess.js actuellement AFFICHÉE (live en résolution, ou case d'historique).
+function curChess() {
+  return explore ? new Chess(history[histIdx].fen) : game;
+}
+
 function onDragStart(source) {
-  if (solved || busy || reviewing()) return false;
-  // n'autorise à saisir que les pièces du camp au trait
-  const piece = game.get(source);
-  return piece && piece.color === game.turn();
+  if (busy) return false;
+  if (!explore && (solved || reviewing())) return false;  // résolution : pas de jeu hors trait
+  const g = curChess();
+  const piece = g.get(source);
+  return piece && piece.color === g.turn();
+}
+
+// Coup joué en mode exploration (analyse libre, sans validation contre la solution).
+function exploreMove(source, target) {
+  const g = new Chess(history[histIdx].fen);
+  const mv = g.move({ from: source, to: target, promotion: "q" });
+  if (!mv) return false;
+  history = history.slice(0, histIdx + 1);          // on branche depuis la position courante
+  history.push({ fen: g.fen(), lastMove: [mv.from, mv.to], explain: "" });
+  histIdx = history.length - 1;
+  lastMove = [mv.from, mv.to];
+  clearSelection(); clearRefute();
+  board.position(g.fen());
+  drawLastMove(); updateEval(g.fen()); updateNav(); renderMoveLog();
+  return true;
 }
 
 function onDrop(source, target) {
   // Clic simple (relâché sur la même case) : on GARDE la sélection et les points.
   if (source === target) return;
   clearSelection();
+  if (explore) { if (!exploreMove(source, target)) return "snapback"; return; }
   if (!tryMove(source, target)) return "snapback";
 }
 
@@ -182,8 +205,8 @@ async function validate(uci) {
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
-      solved = true;
-      setStatus("✅ Résolu ! Bien joué.", "ok");
+      solved = true; explore = true;  // exploration libre de la suite
+      setStatus("✅ Résolu ! Tu peux continuer à bouger les pièces pour explorer.", "ok");
       if (data.line_san) { $line.textContent = data.line_san.join("  ");
                            $lineWrap.style.display = "block"; }
     } else {
@@ -259,16 +282,18 @@ function bindBoardEvents() {
   $boardEl.addEventListener("mousedown", e => {
     if (e.button !== 0) return;
     if (annotations.length || refuteMove) { annotations = []; refuteMove = null; drawAnnot(); }
-    if (reviewing()) { clearSelection(); return; }  // pas de jeu en mode revue
+    if (!explore && reviewing()) { clearSelection(); return; }  // revue (résolution) : pas de jeu
     const sq = squareFromEvent(e);
     if (!sq) { clearSelection(); return; }
     if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
     if (selected && isLegalDest(selected, sq)) {
-      const from = selected; clearSelection(); tryMove(from, sq);
+      const from = selected; clearSelection();
+      if (explore) exploreMove(from, sq); else tryMove(from, sq);
       return;
     }
-    const piece = game && game.get(sq);
-    if (piece && piece.color === game.turn() && !solved) {
+    const cg = curChess();
+    const piece = cg && cg.get(sq);
+    if (piece && piece.color === cg.turn() && (explore || !solved)) {
       selectSquare(sq);
     } else {
       clearSelection();
@@ -291,8 +316,9 @@ function bindBoardEvents() {
 }
 
 function isLegalDest(from, to) {
-  if (!game) return false;
-  return game.moves({ square: from, verbose: true }).some(m => m.to === to);
+  const g = curChess();
+  if (!g) return false;
+  return g.moves({ square: from, verbose: true }).some(m => m.to === to);
 }
 
 function selectSquare(sq) {
@@ -427,10 +453,11 @@ function drawHints() {
   const g = document.getElementById("g-hints");
   if (!g) return;
   g.innerHTML = "";
-  if (!selected || !game) return;
+  const cg = curChess();
+  if (!selected || !cg) return;
   // case sélectionnée surlignée
   rectHighlight(g, selected, "rgba(255,221,0,0.45)");
-  for (const m of game.moves({ square: selected, verbose: true })) {
+  for (const m of cg.moves({ square: selected, verbose: true })) {
     const c = centers[m.to];
     if (!c) continue;
     const capture = m.flags.includes("c") || m.flags.includes("e");
@@ -538,7 +565,8 @@ async function showSolution() {
     // anime du début à la fin (puis navigable avec ⏮ ◀ ▶ ⏭)
     setStatus("Rejeu de la solution…", "");
     for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
-    setStatus("Solution rejouée.", "ok");
+    explore = true;  // exploration libre après le rejeu
+    setStatus("Solution rejouée. Tu peux continuer à bouger les pièces.", "ok");
   } finally { busy = false; }
 }
 
