@@ -178,6 +178,11 @@
       #board { width: min(480px, 92vw); }         /* échiquier plein, centré */
       .controls, .level { width: 100%; }
       .level { justify-content: center; }
+      /* tout sur une seule ligne : indices, solution, flèches, nouveau */
+      .controls { flex-wrap: nowrap; gap: 4px; }
+      .cgroup { gap: 4px; }
+      .ibtn { padding: 6px 8px; font-size: 1rem; }
+      .newbtn { font-size: .78rem; padding: 6px 8px; }
       #status { font-size: 1.2rem; justify-content: center; text-align: center; }
     }
   </style>
