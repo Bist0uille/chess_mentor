@@ -4,4 +4,6 @@ __pycache__/
 *.zst
 .venv/
 .env
+.env.*
+*.local
 .vercel/
