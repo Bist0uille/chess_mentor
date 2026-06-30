@@ -15,6 +15,15 @@ let centers = {};         // case -> {x,y} en px relatifs à #board
 let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
 let loadedHints = null;   // les 4 indices, chargés en un seul appel
+let refuteMove = null;    // flèche de réfutation (coup du moteur)
+
+const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
+const REFUTE_COLOR = "rgba(179,38,30,0.85)";
+
+// Notation française des pièces côté client (K→R, Q→D, R→T, B→F, N→C).
+function frSan(s) {
+  return s.replace(/[KQRBN]/g, c => ({ K: "R", Q: "D", R: "T", B: "F", N: "C" }[c]));
+}
 
 function band() {
   const [lo, hi] = document.getElementById("level").value.split("-").map(Number);
@@ -51,7 +60,7 @@ async function loadPuzzle() {
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
   hintLevel = 0; ply = 0; solved = false; lastMove = []; loadedHints = null;
-  clearSelection(); annotations = []; redrawAll();
+  clearSelection(); annotations = []; clearRefute(); redrawAll();
   const b = band();
   const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
@@ -71,6 +80,7 @@ async function loadPuzzle() {
   setupOverlay();
   updateProgress();
   setStatus("À toi de jouer.", "");
+  updateEval(puzzle.fen);
 }
 
 /* ---------- coups (drag + clic) ---------- */
@@ -142,8 +152,10 @@ async function validate(uci) {
         ? "❌ Coup légal, mais ce n'est pas la solution. Réessaie."
         : "❌ Coup invalide.", "ko");
       board.position(game.fen());
+      if (data.legal) refute(uci);  // le moteur explique pourquoi ça échoue
       return;
     }
+    clearRefute();
     game.move(uciToObj(uci));
     lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
     if (data.opponent_uci) {
@@ -152,6 +164,7 @@ async function validate(uci) {
     }
     board.position(game.fen());
     drawLastMove();
+    updateEval(game.fen());
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
@@ -178,9 +191,14 @@ function setupOverlay() {
     "position:absolute;inset:0;pointer-events:none;z-index:15";
   // marqueur de pointe de flèche
   svg.innerHTML =
-    `<defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
-       markerHeight="4" orient="auto-start-reverse">
-       <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker></defs>
+    `<defs>
+       <marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
+         markerHeight="4" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker>
+       <marker id="ahr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
+         markerHeight="4" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 z" fill="${REFUTE_COLOR}"/></marker>
+     </defs>
      <g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
   $boardEl.style.position = "relative";
   $boardEl.appendChild(svg);
@@ -226,7 +244,7 @@ function bindBoardEvents() {
   // clic GAUCHE : sélection / clic-pour-jouer (+ efface les annotations)
   $boardEl.addEventListener("mousedown", e => {
     if (e.button !== 0) return;
-    if (annotations.length) { annotations = []; drawAnnot(); }
+    if (annotations.length || refuteMove) { annotations = []; refuteMove = null; drawAnnot(); }
     const sq = squareFromEvent(e);
     if (!sq) { clearSelection(); return; }
     if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
@@ -284,6 +302,55 @@ function drawLastMove() {
   for (const sq of lastMove) rectHighlight(g, sq, "rgba(255,221,0,0.32)");
 }
 
+/* ---------- moteur : barre d'éval + réfutation ---------- */
+async function updateEval(fen) {
+  if (!engine.ok) return;
+  const res = await engine.analyse(fen, 11);
+  const ev = whiteEval(res);
+  const fill = document.getElementById("evalfill");
+  const num = document.getElementById("evalnum");
+  if (!ev) return;
+  let share;  // part des Blancs (0..100), 50 = égalité
+  if (ev.mate != null) share = ev.mate > 0 ? 100 : 0;
+  else share = Math.max(2, Math.min(98, 50 + ev.cp / 16));
+  fill.style.width = share + "%";
+  num.textContent = formatEval(ev);
+}
+
+async function refute(uci) {
+  if (!engine.ok) return;
+  const g = new Chess(game.fen());
+  const mine = g.move(uciToObj(uci));
+  if (!mine) return;
+  const res = await engine.analyse(g.fen(), 14);
+  if (!res || !res.bestmove) return;
+  const reply = g.move(uciToObj(res.bestmove));
+  // éval du point de vue du SOLVEUR (= - score relatif à l'adversaire au trait)
+  let verdict;
+  if (res.mate != null) {
+    const m = -res.mate;
+    verdict = m < 0 ? `tu te fais mater en ${Math.abs(m)}` : "la position reste tenable";
+  } else {
+    const cp = -res.cp / 100;
+    verdict = cp <= -2 ? `tu es perdant (éval ${cp.toFixed(1).replace(".", ",")})`
+            : cp <= -0.5 ? `tu es moins bien (éval ${cp.toFixed(1).replace(".", ",")})`
+            : "ce n'est pas la solution";
+  }
+  const $r = document.getElementById("refute");
+  $r.innerHTML = `<b>Pourquoi ça ne marche pas :</b> après ton coup, l'adversaire ` +
+    `joue <b>${reply ? escapeHtml(frSan(reply.san)) : res.bestmove}</b> et ${verdict}.`;
+  $r.style.display = "block";
+  // flèche rouge de réfutation sur l'échiquier
+  refuteMove = { from: res.bestmove.slice(0, 2), to: res.bestmove.slice(2, 4) };
+  drawAnnot();
+}
+
+function clearRefute() {
+  refuteMove = null;
+  const $r = document.getElementById("refute");
+  if ($r) $r.style.display = "none";
+}
+
 function drawHints() {
   const g = document.getElementById("g-hints");
   if (!g) return;
@@ -320,6 +387,23 @@ function rectHighlight(g, sq, color) {
   g.appendChild(r);
 }
 
+function drawArrow(g, from, to, color, marker) {
+  const a0 = centers[from], b0 = centers[to];
+  if (!a0 || !b0) return;
+  const dx = b0.x - a0.x, dy = b0.y - a0.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const shrink = sqSize * 0.34;
+  const ex = b0.x - (dx / len) * shrink, ey = b0.y - (dy / len) * shrink;
+  const line = document.createElementNS(NS, "line");
+  line.setAttribute("x1", a0.x); line.setAttribute("y1", a0.y);
+  line.setAttribute("x2", ex); line.setAttribute("y2", ey);
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width", sqSize * 0.16);
+  line.setAttribute("stroke-linecap", "round");
+  line.setAttribute("marker-end", `url(#${marker})`);
+  g.appendChild(line);
+}
+
 function drawAnnot() {
   const g = document.getElementById("g-annot");
   if (!g) return;
@@ -335,23 +419,10 @@ function drawAnnot() {
       circ.setAttribute("stroke-width", sqSize * 0.07);
       g.appendChild(circ);
     } else {
-      const a0 = centers[a.from], b0 = centers[a.to];
-      if (!a0 || !b0) continue;
-      // raccourcit la flèche pour ne pas masquer la case cible
-      const dx = b0.x - a0.x, dy = b0.y - a0.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const shrink = sqSize * 0.34;
-      const ex = b0.x - (dx / len) * shrink, ey = b0.y - (dy / len) * shrink;
-      const line = document.createElementNS(NS, "line");
-      line.setAttribute("x1", a0.x); line.setAttribute("y1", a0.y);
-      line.setAttribute("x2", ex); line.setAttribute("y2", ey);
-      line.setAttribute("stroke", ARROW_COLOR);
-      line.setAttribute("stroke-width", sqSize * 0.16);
-      line.setAttribute("stroke-linecap", "round");
-      line.setAttribute("marker-end", "url(#ah)");
-      g.appendChild(line);
+      drawArrow(g, a.from, a.to, ARROW_COLOR, "ah");
     }
   }
+  if (refuteMove) drawArrow(g, refuteMove.from, refuteMove.to, REFUTE_COLOR, "ahr");
 }
 
 /* ---------- indices & solution ---------- */

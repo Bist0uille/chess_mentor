@@ -58,6 +58,16 @@
       </div>
       <div id="status"></div>
       <div id="progress" style="font-size:.85rem;color:#777"></div>
+      <div id="evalwrap" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div style="font-size:.8rem;color:#777">Éval</div>
+        <div id="evalbar" style="position:relative;flex:1;height:12px;background:#3a3a3a;
+             border-radius:6px;overflow:hidden">
+          <div id="evalfill" style="position:absolute;left:0;top:0;bottom:0;width:50%;
+               background:#f4f1ea;transition:width .25s"></div>
+          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#c08552"></div>
+        </div>
+        <div id="evalnum" style="font-size:.8rem;width:42px;text-align:right;color:#555">—</div>
+      </div>
     </div>
 
     <div class="panel">
@@ -66,6 +76,8 @@
         du plus vague au plus précis. Le but : comprendre <i>pourquoi</i>, pas
         deviner.
       </p>
+      <div id="refute" style="display:none;background:#fde8e6;border-left:3px solid #b3261e;
+           padding:10px 12px;margin:8px 0;border-radius:4px;font-size:.92rem"></div>
       <ol class="hints" id="hints"></ol>
       <div id="lineWrap" style="display:none">
         <p style="margin-bottom:4px">Ligne solution :</p>
@@ -77,6 +89,7 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="/static/engine.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

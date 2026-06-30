@@ -24,9 +24,14 @@ Base de puzzles Lichess (FEN + solution + rating + thèmes)
    FastAPI + échiquier web (chessboard.js) — indices progressifs 1→4, multi-coups
 ```
 
-Le cœur, ce sont les **détecteurs** : ils calculent des faits vérifiables, qui
-**ancrent** la narration du modèle. Le coach n'invente jamais un coup ou une
-pièce — il ne reformule que ce que les détecteurs ont prouvé.
+Le cœur, ce sont les **détecteurs** + l'**annotateur** (`explain.py`) : ils
+analysent la solution coup par coup et produisent des indices factuels, sans
+jamais inventer un coup ou une pièce.
+
+Un **moteur d'échecs tourne aussi dans le navigateur** (Lozza, UCI, JS pur, MIT —
+`static/lozza.js`) : il fournit la barre d'évaluation et **réfute tes mauvais
+essais** (« après ton coup, l'adversaire joue … et tu es perdant »). 100% côté
+client : aucun coût serveur, aucun token.
 
 ## Lancer en local
 
