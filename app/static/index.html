@@ -56,7 +56,8 @@
       background: #e9e9e9; transition: height .25s;
     }
     .evalnum { font-size: .72rem; color: var(--muted); min-width: 40px; text-align: center; }
-    #board { width: min(440px, 82vw); }
+    #board { width: min(440px, 82vw); touch-action: none; }
+    #board * { touch-action: none; }  /* glisser une pièce ne fait pas défiler la page */
 
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
     .btn {
@@ -188,11 +189,6 @@
       </section>
 
       <section class="panel">
-        <p class="intro">
-          Demande un <b>indice</b> pour suivre le raisonnement, du plus vague au
-          plus précis. Le but : comprendre <b>pourquoi</b>, pas deviner. Joue un
-          coup faux et le moteur t'expliquera pourquoi il échoue.
-        </p>
         <div id="refute" class="refute" style="display:none"></div>
         <div id="movelog" class="movelog" style="display:none"></div>
         <ol class="hints" id="hints"></ol>
