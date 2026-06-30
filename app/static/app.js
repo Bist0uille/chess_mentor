@@ -21,7 +21,7 @@ let histIdx = 0;          // index courant dans l'historique
 let explore = false;      // mode exploration libre (après résolution)
 
 const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
-const REFUTE_COLOR = "#882020";   // rouge Lichess, opaque (couleur uniforme, sans superposition)
+const REFUTE_COLOR = "rgba(214,92,80,0.55)";   // rouge clair translucide (polygone d'un seul tenant)
 
 // Notation française des pièces côté client (K→R, Q→D, R→T, B→F, N→C).
 function frSan(s) {
@@ -34,7 +34,7 @@ function band() {
 }
 
 const NS = "http://www.w3.org/2000/svg";
-const ARROW_COLOR = "#15781B";   // vert Lichess, opaque (couleur uniforme, sans superposition)
+const ARROW_COLOR = "rgba(74,170,80,0.55)";   // vert clair translucide (polygone d'un seul tenant)
 
 const $status = document.getElementById("status");
 const $meta = document.getElementById("meta");
@@ -234,17 +234,8 @@ function setupOverlay() {
   svg.setAttribute("height", "100%");
   svg.style.cssText =
     "position:absolute;inset:0;pointer-events:none;z-index:15";
-  // marqueur de pointe de flèche
   svg.innerHTML =
-    `<defs>
-       <marker id="ah" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="3.6"
-         markerHeight="3.6" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker>
-       <marker id="ahr" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="3.6"
-         markerHeight="3.6" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 z" fill="${REFUTE_COLOR}"/></marker>
-     </defs>
-     <g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
+    `<g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
   $boardEl.style.position = "relative";
   $boardEl.appendChild(svg);
   computeCenters();
@@ -515,22 +506,34 @@ function rectHighlight(g, sq, color) {
   g.appendChild(r);
 }
 
-function drawArrow(g, from, to, color, marker) {
-  const a0 = centers[from], b0 = centers[to];
-  if (!a0 || !b0) return;
-  const dx = b0.x - a0.x, dy = b0.y - a0.y;
+// Flèche dessinée comme UN SEUL polygone (corps + pointe) : remplissage uniforme,
+// donc transparence homogène, sans superposition d'alpha ni jointure visible.
+function drawArrow(g, from, to, color) {
+  const a = centers[from], b = centers[to];
+  if (!a || !b) return;
+  const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
-  const shrink = sqSize * 0.46;
-  const ex = b0.x - (dx / len) * shrink, ey = b0.y - (dy / len) * shrink;
-  const line = document.createElementNS(NS, "line");
-  line.setAttribute("x1", a0.x); line.setAttribute("y1", a0.y);
-  line.setAttribute("x2", ex); line.setAttribute("y2", ey);
-  line.setAttribute("stroke", color);
-  line.setAttribute("stroke-width", sqSize * 0.20);
-  line.setAttribute("stroke-linecap", "round");
-  line.setAttribute("stroke-linejoin", "round");
-  line.setAttribute("marker-end", `url(#${marker})`);
-  g.appendChild(line);
+  const ux = dx / len, uy = dy / len;     // direction
+  const px = -uy, py = ux;                 // perpendiculaire
+  const sw = sqSize * 0.10;                // demi-largeur du corps
+  const hw = sqSize * 0.21;                // demi-largeur de la tête
+  const headLen = sqSize * 0.33;           // longueur de la tête
+  const tipInset = sqSize * 0.06;          // pointe un peu avant le centre cible
+  const tx = b.x - ux * tipInset, ty = b.y - uy * tipInset;   // pointe
+  const cx = tx - ux * headLen, cy = ty - uy * headLen;       // base de la tête
+  const pts = [
+    [a.x + px * sw, a.y + py * sw],
+    [cx + px * sw, cy + py * sw],
+    [cx + px * hw, cy + py * hw],
+    [tx, ty],
+    [cx - px * hw, cy - py * hw],
+    [cx - px * sw, cy - py * sw],
+    [a.x - px * sw, a.y - py * sw],
+  ].map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const poly = document.createElementNS(NS, "polygon");
+  poly.setAttribute("points", pts);
+  poly.setAttribute("fill", color);
+  g.appendChild(poly);
 }
 
 function drawAnnot() {
@@ -548,10 +551,10 @@ function drawAnnot() {
       circ.setAttribute("stroke-width", sqSize * 0.05);
       g.appendChild(circ);
     } else {
-      drawArrow(g, a.from, a.to, ARROW_COLOR, "ah");
+      drawArrow(g, a.from, a.to, ARROW_COLOR);
     }
   }
-  if (refuteMove) drawArrow(g, refuteMove.from, refuteMove.to, REFUTE_COLOR, "ahr");
+  if (refuteMove) drawArrow(g, refuteMove.from, refuteMove.to, REFUTE_COLOR);
 }
 
 /* ---------- indices & solution ---------- */
