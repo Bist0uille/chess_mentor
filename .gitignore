@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+/puzzles.sqlite
+*.zst
+.venv/
+.env
+.vercel/

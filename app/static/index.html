@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coach d'échecs — signaux faibles</title>
+  <link rel="stylesheet"
+        href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f4f1ea; color: #2b2b2b; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 24px; display: grid;
+            grid-template-columns: 420px 1fr; gap: 28px; }
+    h1 { grid-column: 1 / -1; font-size: 1.4rem; margin: 0 0 8px; }
+    #board { width: 400px; }
+    .meta { font-size: .9rem; color: #555; margin: 10px 0; }
+    .controls button { margin: 4px 6px 4px 0; padding: 8px 12px; cursor: pointer;
+            border: 1px solid #c9b; border-radius: 6px; background: #fff; }
+    #status { font-weight: 600; min-height: 1.4em; margin: 10px 0; }
+    #status.ok { color: #2e7d32; }
+    #status.ko { color: #b3261e; }
+    .hints { list-style: none; padding: 0; }
+    .hints li { background: #fff; border-left: 3px solid #c08552; padding: 10px 12px;
+            margin: 8px 0; border-radius: 4px; }
+    .hints li b { color: #c08552; }
+    .panel { min-width: 0; }
+    .line { font-family: ui-monospace, monospace; background:#fff; padding:8px; border-radius:4px; }
+    @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>♟️ Coach de raisonnement — repère les signaux faibles</h1>
+
+    <div>
+      <div id="board"></div>
+      <div class="meta" id="meta">Chargement…</div>
+      <div class="controls">
+        <button id="new">Nouveau puzzle</button>
+        <button id="hint">Indice suivant</button>
+        <button id="solution">Voir la solution</button>
+      </div>
+      <div id="status"></div>
+      <div id="progress" style="font-size:.85rem;color:#777"></div>
+    </div>
+
+    <div class="panel">
+      <p style="color:#666;font-size:.9rem">
+        À toi de jouer. Demande un <b>indice</b> pour suivre le raisonnement,
+        du plus vague au plus précis. Le but : comprendre <i>pourquoi</i>, pas
+        deviner.
+      </p>
+      <ol class="hints" id="hints"></ol>
+      <div id="lineWrap" style="display:none">
+        <p style="margin-bottom:4px">Ligne solution :</p>
+        <div class="line" id="line"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
