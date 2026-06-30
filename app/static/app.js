@@ -610,6 +610,7 @@ function escapeHtml(s) {
 }
 
 document.getElementById("new").onclick = loadPuzzle;
+document.getElementById("level").onchange = loadPuzzle;   // changer de niveau = nouveau problème
 document.getElementById("hint").onclick = nextHint;
 document.getElementById("solution").onclick = showSolution;
 document.getElementById("navStart").onclick = () => showHist(0);
