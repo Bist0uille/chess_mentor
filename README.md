@@ -48,8 +48,9 @@ uvicorn app.main:app --reload   # http://localhost:8000
 Le projet est prêt pour Vercel (Python serverless) :
 - `api/index.py` expose l'app ASGI, `vercel.json` route tout vers elle.
 - La base `data/puzzles.sqlite` est embarquée (lecture seule).
-- Pour activer la narration Claude en ligne : ajouter `ANTHROPIC_API_KEY` dans
-  les variables d'environnement du projet Vercel (sinon, indices-gabarits).
+- **Narration Claude désactivée par défaut** (économie de tokens). Pour l'activer :
+  définir `CHESS_COACH_LLM=on` **et** `ANTHROPIC_API_KEY` dans les variables d'env Vercel.
+  Modèle : `CHESS_COACH_MODEL` (défaut `claude-haiku-4-5`). Sans ça → indices-gabarits.
 
 ## Endpoints
 

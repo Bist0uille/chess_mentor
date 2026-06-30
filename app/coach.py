@@ -21,35 +21,37 @@ _HINT_CACHE: dict = {}
 # Notation française des pièces : K→R, Q→D, R→T, B→F, N→C (les fichiers a-h restent).
 _SAN_FR = str.maketrans({"K": "R", "Q": "D", "R": "T", "B": "F", "N": "C"})
 
-# Traduction des thèmes Lichess (anglais) vers le français.
+# Traductions FRANÇAISES OFFICIELLES de Lichess (translation/dest/puzzleTheme/fr-FR.xml).
 THEME_FR = {
-    "fork": "fourchette", "pin": "clouage", "skewer": "enfilade",
-    "hangingPiece": "pièce en prise", "trappedPiece": "pièce piégée",
-    "discoveredAttack": "attaque à la découverte", "doubleCheck": "échec double",
-    "sacrifice": "sacrifice", "deflection": "déviation", "attraction": "attraction",
-    "clearance": "dégagement", "interference": "interception",
-    "capturingDefender": "élimination du défenseur", "overloading": "surcharge",
-    "backRankMate": "mat du couloir", "smotheredMate": "mat étouffé",
-    "bodenMate": "mat de Boden", "doubleBishopMate": "mat des deux fous",
-    "hookMate": "mat en hameçon", "arabianMate": "mat arabe",
-    "anastasiaMate": "mat d'Anastasie", "killBoxMate": "mat de la boîte",
-    "mate": "mat", "mateIn1": "mat en 1", "mateIn2": "mat en 2",
-    "mateIn3": "mat en 3", "mateIn4": "mat en 4", "mateIn5": "mat en 5",
-    "advancedPawn": "pion avancé", "promotion": "promotion",
-    "enPassant": "prise en passant", "castling": "roque",
-    "exposedKing": "roi exposé", "kingsideAttack": "attaque sur l'aile roi",
-    "queensideAttack": "attaque sur l'aile dame", "zugzwang": "zugzwang",
-    "quietMove": "coup tranquille", "defensiveMove": "coup défensif",
-    "intermezzo": "coup intermédiaire", "xRayAttack": "attaque en rayon X",
-    "doubleAttack": "double attaque", "attackingF2F7": "attaque en f2/f7",
-    "opening": "ouverture", "middlegame": "milieu de partie", "endgame": "finale",
-    "rookEndgame": "finale de tours", "pawnEndgame": "finale de pions",
-    "queenEndgame": "finale de dames", "bishopEndgame": "finale de fous",
-    "knightEndgame": "finale de cavaliers", "queenRookEndgame": "finale dame et tour",
-    "crushing": "écrasant", "advantage": "avantage", "equality": "égalité",
-    "short": "court", "long": "long", "veryLong": "très long", "oneMove": "un coup",
-    "master": "niveau maître", "masterVsMaster": "maître contre maître",
-    "superGM": "super grand maître",
+    "short": "Court problème", "endgame": "Finale", "middlegame": "Milieu de jeu",
+    "crushing": "Écrasant", "mate": "Mat", "advantage": "Avantage",
+    "long": "Long problème", "master": "Parties de maîtres", "mateIn1": "Mat en 1",
+    "oneMove": "Problème à un coup", "fork": "Fourchette", "mateIn2": "Mat en 2",
+    "kingsideAttack": "Attaque sur l'aile roi", "sacrifice": "Sacrifice",
+    "pin": "Clouage", "advancedPawn": "Pion avancé", "rookEndgame": "Finale de Tours",
+    "veryLong": "Très long problème", "opening": "Ouverture",
+    "discoveredAttack": "Attaque à la découverte", "defensiveMove": "Coup défensif",
+    "deflection": "Déviation", "mateIn3": "Mat en 3", "attraction": "Attraction",
+    "hangingPiece": "Pièce en prise", "pawnEndgame": "Finale de pions",
+    "exposedKing": "Roi exposé", "promotion": "Promotion", "quietMove": "Coup silencieux",
+    "skewer": "Enfilade", "clearance": "Dégagement", "backRankMate": "Mat du couloir",
+    "discoveredCheck": "Échec à la découverte", "queenEndgame": "Finale de Dames",
+    "queensideAttack": "Attaque sur l'aile dame", "operaMate": "Mat de l'opéra",
+    "masterVsMaster": "Parties jouées entre maîtres", "bishopEndgame": "Finale de Fous",
+    "intermezzo": "Coup intermédiaire", "queenRookEndgame": "Dames et Tours",
+    "pillsburysMate": "Mat de Pillsbury", "zugzwang": "Zugzwang",
+    "trappedPiece": "Pièce enfermée", "knightEndgame": "Finale de Cavaliers",
+    "doubleCheck": "Échec double", "smotheredMate": "Mat à l'étouffée",
+    "interference": "Interception", "attackingF2F7": "Attaque sur f2 ou f7",
+    "morphysMate": "Mat de Morphy", "cornerMate": "Mat en coin", "equality": "Égalité",
+    "capturingDefender": "Capturez le défenseur", "swallowstailMate": "Mat du guéridon",
+    "epauletteMate": "Mat des épaulettes", "mateIn4": "Mat en 4",
+    "hookMate": "Mat du hameçon", "arabianMate": "Mat des Arabes",
+    "vukovicMate": "Mat de Vukovic", "dovetailMate": "Mat de Cozio",
+    "triangleMate": "Mat du triangle", "anastasiaMate": "Mat d'Anastasie",
+    "superGM": "Parties de super GM", "enPassant": "Prise en passant",
+    "balestraMate": "Mat de l'arbalète", "killBoxMate": "Mat par mise en boîte",
+    "xRayAttack": "Attaque « rayons X »", "blindSwineMate": "Mat des deux tours",
 }
 
 
@@ -205,7 +207,10 @@ def get_hints(puzzle: dict, target_elo: int) -> List[str]:
     sans = solution_san_fr(board, sol_uci)  # notation française pour l'affichage
     themes = puzzle.get("themes", "") or ""
 
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    # Narrateur Claude désactivé par défaut (économie de tokens).
+    # Pour l'activer : variable d'env CHESS_COACH_LLM=on (+ ANTHROPIC_API_KEY).
+    llm_on = os.environ.get("CHESS_COACH_LLM", "off").lower() in ("on", "1", "true", "yes")
+    if llm_on and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             hints = _claude_hints(board, signals, sans, sol_uci, themes, target_elo)
         except Exception as e:  # repli robuste si l'API échoue
