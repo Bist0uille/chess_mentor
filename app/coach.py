@@ -10,7 +10,10 @@ import chess
 
 from . import signal_detectors as sd
 
-MODEL = os.environ.get("CHESS_COACH_MODEL", "claude-opus-4-8")
+# Haiku par défaut : la reformulation d'indices ancrés ne nécessite pas Opus,
+# et c'est ~20x moins cher. Surchargé par la variable d'env CHESS_COACH_MODEL.
+MODEL = os.environ.get("CHESS_COACH_MODEL", "claude-haiku-4-5")
+MAX_TOKENS = int(os.environ.get("CHESS_COACH_MAX_TOKENS", "600"))
 
 # Cache mémoire des indices par puzzle (évite de rappeler l'API à chaque niveau)
 _HINT_CACHE: dict = {}
@@ -172,11 +175,16 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     }
     resp = client.messages.create(
         model=MODEL,
-        max_tokens=1200,
+        max_tokens=MAX_TOKENS,
         system=system,
         messages=[{"role": "user", "content": json.dumps(user, ensure_ascii=False)}],
         output_config={"format": {"type": "json_schema", "schema": schema}},
     )
+    u = resp.usage
+    # Coût estimé (Haiku 4.5 : 1$/1M in, 5$/1M out). Visible dans les logs Vercel.
+    cost = u.input_tokens / 1e6 * 1.0 + u.output_tokens / 1e6 * 5.0
+    print(f"[coach] {MODEL} in={u.input_tokens} out={u.output_tokens} "
+          f"~${cost:.5f} (~{cost * 92:.3f} centimes EUR)")
     text = next(b.text for b in resp.content if b.type == "text")
     hints = json.loads(text)["hints"]
     if len(hints) < 4:
