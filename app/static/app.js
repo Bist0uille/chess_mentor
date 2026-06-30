@@ -213,8 +213,8 @@ async function validate(uci) {
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
-      solved = true; explore = true;  // exploration libre de la suite
-      setStatus("✅ Résolu ! Tu peux explorer la suite.", "ok");
+      solved = true; explore = true;  // exploration libre de la suite (bonus, silencieux)
+      setStatus("✅ Résolu !", "ok");
       if (data.line_san) { $line.textContent = data.line_san.join("  ");
                            $lineWrap.style.display = "block"; }
     } else {
@@ -595,8 +595,8 @@ async function showSolution() {
     // anime du début à la fin (puis navigable avec ⏮ ◀ ▶ ⏭)
     setStatus("Rejeu de la solution…", "");
     for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
-    explore = true;  // exploration libre après le rejeu
-    setStatus("Solution rejouée — explore librement.", "ok");
+    explore = true;  // exploration libre après le rejeu (bonus, silencieux)
+    setStatus("Solution affichée.", "ok");
   } finally { busy = false; }
 }
 
