@@ -52,7 +52,7 @@ function uciToObj(uci) {
            promotion: uci.length > 4 ? uci[4] : undefined };
 }
 function updateProgress() {
-  if (!puzzle) return;
+  if (!puzzle || !$progress) return;
   $progress.textContent =
     `Coup ${Math.min(ply + 1, puzzle.n_solver_moves)} / ${puzzle.n_solver_moves}`;
 }
@@ -76,8 +76,7 @@ async function loadPuzzle() {
   game = new Chess(puzzle.fen);
   const orientation = puzzle.side_to_move === "w" ? "white" : "black";
   const trait = puzzle.side_to_move === "w" ? "Blancs" : "Noirs";
-  $meta.innerHTML = `Trait aux <b>${trait}</b> · rating ${puzzle.rating} · ` +
-    `${puzzle.n_solver_moves} coup(s) à trouver`;
+  $meta.innerHTML = `Trait aux <b>${trait}</b> · rating ${puzzle.rating}`;
   $themes.innerHTML = `<b>Thèmes :</b> ${(puzzle.themes || []).join(", ") || "—"}`;
   history = [{ fen: puzzle.fen, lastMove: [], explain: "" }];
   histIdx = 0;

@@ -25,7 +25,7 @@
     .brand {
       font-size: 1.7rem; color: var(--text); letter-spacing: -.01em;
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      margin: 4px 0 16px;
+      margin: 6px 0 34px;
     }
     .brand b { color: var(--text); font-weight: 700; }
     #status {
@@ -76,15 +76,17 @@
       border: 1px solid var(--border);
     }
 
-    .nav { display: flex; gap: 6px; }
-    .navbtn {
-      padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 1rem;
-      border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    .controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .cgroup { display: flex; gap: 6px; }
+    .ibtn {
+      padding: 8px 11px; border-radius: 8px; cursor: pointer; font-size: 1.15rem;
+      line-height: 1; border: 1px solid var(--border); background: var(--panel); color: var(--text);
     }
-    .navbtn:hover:not(:disabled) { border-color: var(--green); }
-    .navbtn:disabled { opacity: .35; cursor: default; }
+    .ibtn:hover:not(:disabled) { border-color: var(--green); }
+    .ibtn:disabled { opacity: .35; cursor: default; }
+    .ibtn.primary { background: var(--green); border-color: var(--green); }
 
-    .themes { font-size: .82rem; color: var(--muted); line-height: 1.55; }
+    .themes { font-size: .82rem; color: var(--muted); line-height: 1.55; margin-top: 14px; }
     .themes b { color: var(--text); }
 
     .panel { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -134,15 +136,14 @@
     .promo button:hover { border-color: var(--green); }
 
     @media (max-width: 820px) {
-      .grid { grid-template-columns: 1fr; gap: 18px; }
-      .left { width: 100%; }
-      /* bloc centré + marge droite = (barre 14 + espace 10) pour que l'échiquier
-         soit à égale distance des deux bords malgré la barre d'éval à gauche */
-      .boardrow { width: fit-content; margin-inline: auto; padding-right: 24px; }
-      .evalcol { width: 14px; }
-      .evalnum { display: none; }   /* on garde la barre, on masque le nombre */
-      .nav, .toolbar { justify-content: center; }
-      #board { width: min(440px, 76vw); }
+      .app { padding: 14px 12px 36px; }
+      .grid { grid-template-columns: 1fr; gap: 16px; }
+      .left { width: 100%; align-items: center; }
+      .evalcol { display: none; }                 /* barre d'éval masquée → plus de place */
+      .boardrow { width: fit-content; margin-inline: auto; }
+      #board { width: min(480px, 92vw); }         /* échiquier plein, centré */
+      .controls, .level { width: 100%; }
+      .level { justify-content: center; }
       #status { font-size: 1.25rem; text-align: center; }
     }
   </style>
@@ -156,7 +157,6 @@
     <div class="grid">
       <section class="left">
         <div class="meta" id="meta">Chargement…</div>
-        <div class="progress" id="progress"></div>
 
         <div class="boardrow">
           <div class="evalcol">
@@ -166,17 +166,18 @@
           <div id="board"></div>
         </div>
 
-        <div class="nav">
-          <button id="navStart" class="navbtn" title="Position de départ">⏮</button>
-          <button id="navPrev" class="navbtn" title="Coup précédent">◀</button>
-          <button id="navNext" class="navbtn" title="Coup suivant">▶</button>
-          <button id="navEnd" class="navbtn" title="Dernière position">⏭</button>
-        </div>
-
-        <div class="toolbar">
-          <button id="hint" class="btn primary">Indice</button>
-          <button id="new" class="btn">Nouveau puzzle</button>
-          <button id="solution" class="btn">Voir la solution</button>
+        <div class="controls">
+          <span class="cgroup">
+            <button id="hint" class="ibtn primary" title="Indice">💡</button>
+            <button id="solution" class="ibtn" title="Voir la solution">👁️</button>
+          </span>
+          <span class="cgroup">
+            <button id="navStart" class="ibtn" title="Position de départ">«</button>
+            <button id="navPrev" class="ibtn" title="Coup précédent">◀</button>
+            <button id="navNext" class="ibtn" title="Coup suivant">▶</button>
+            <button id="navEnd" class="ibtn" title="Dernière position">»</button>
+            <button id="new" class="ibtn" title="Nouveau puzzle">🔄</button>
+          </span>
         </div>
         <label class="level">Niveau
           <select id="level">
