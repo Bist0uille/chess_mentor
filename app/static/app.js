@@ -63,7 +63,8 @@ async function loadPuzzle() {
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
   hintLevel = 0; ply = 0; solved = false; lastMove = []; loadedHints = null;
-  clearSelection(); annotations = []; clearRefute(); showMoveInfo(""); redrawAll();
+  clearSelection(); annotations = []; clearRefute(); redrawAll();
+  document.getElementById("movelog").style.display = "none";
   const b = band();
   const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
@@ -87,6 +88,7 @@ async function loadPuzzle() {
   setStatus("À toi de jouer.", "");
   updateEval(puzzle.fen);
   updateNav();
+  renderMoveLog();
 }
 
 /* ---------- coups (drag + clic) ---------- */
@@ -160,7 +162,6 @@ async function validate(uci) {
         ? "❌ Coup légal, mais ce n'est pas la solution. Réessaie."
         : "❌ Coup invalide.", "ko");
       board.position(game.fen());
-      showMoveInfo("");             // on cache l'explication du coup juste
       if (data.legal) refute(uci);  // le moteur explique pourquoi ça échoue
       return;
     }
@@ -177,7 +178,7 @@ async function validate(uci) {
     history.push({ fen: game.fen(), lastMove: lastMove.slice(), explain: data.explain || "" });
     histIdx = history.length - 1;
     updateNav();
-    showMoveInfo(data.explain || "");
+    renderMoveLog();
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
@@ -338,7 +339,7 @@ function showHist(idx) {
   drawLastMove();
   updateEval(h.fen);
   updateNav();
-  showMoveInfo(h.explain || "");
+  renderMoveLog();
 }
 
 /* ---------- moteur : barre d'éval + réfutation ---------- */
@@ -405,12 +406,18 @@ function clearRefute() {
   if ($r) $r.style.display = "none";
 }
 
-function showMoveInfo(text) {
-  const el = document.getElementById("moveinfo");
+function renderMoveLog() {
+  const el = document.getElementById("movelog");
   if (!el) return;
-  if (text) {
-    el.innerHTML = `<b>Pourquoi ce coup :</b> ${escapeHtml(text)}`;
-    el.style.display = "block";
+  const items = [];
+  for (let i = 1; i < history.length; i++) {
+    if (!history[i].explain) continue;
+    const cur = i === histIdx ? " cur" : "";
+    items.push(`<div class="mv${cur}">${escapeHtml(history[i].explain)}</div>`);
+  }
+  if (items.length) {
+    el.innerHTML = `<div class="mvlabel">Pourquoi ces coups</div>` + items.join("");
+    el.style.display = "flex";
   } else {
     el.style.display = "none";
   }
