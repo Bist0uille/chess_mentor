@@ -57,6 +57,25 @@ Le projet est prêt pour Vercel (Python serverless) :
   définir `CHESS_COACH_LLM=on` **et** `ANTHROPIC_API_KEY` dans les variables d'env Vercel.
   Modèle : `CHESS_COACH_MODEL` (défaut `claude-haiku-4-5`). Sans ça → indices-gabarits.
 
+## Tests
+
+Suite automatique (locale) : backend pytest + E2E navigateur (Playwright) + unitaire JS.
+
+```bash
+bash scripts/test.sh        # tout : pytest (backend + E2E) puis node (JS)
+# ou à la main :
+pip install -r requirements-dev.txt && python -m playwright install chromium
+python -m pytest tests/     # backend + E2E
+node tests/test_engine.js   # fonctions pures du moteur (engine.js)
+```
+
+- `tests/test_*.py` : détecteurs, annotateur `explain` (toute la base), endpoints API
+  (+ joueur parfait multi-coups 1500/1500), traductions FR.
+- `tests/e2e/` : Playwright pilote l'échiquier (résolution, réfutation, indice, exploration) ;
+  se **skippe** proprement si Chromium n'est pas installé.
+- Déterminisme E2E : un puzzle précis se charge via `/?puzzle=<id>` (lien partageable).
+- `scripts/selftest.py` reste un smoke rapide sans dépendances.
+
 ## Endpoints
 
 | Méthode | Route | Rôle |

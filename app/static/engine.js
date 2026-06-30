@@ -74,3 +74,8 @@ function formatEval(ev) {
   const v = ev.cp / 100;
   return (v >= 0 ? "+" : "") + v.toFixed(1).replace(".", ",");
 }
+
+// Export Node (pour les tests unitaires) — sans effet dans le navigateur.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { whiteEval, formatEval };
+}

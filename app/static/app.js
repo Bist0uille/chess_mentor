@@ -67,7 +67,10 @@ async function loadPuzzle() {
   clearSelection(); annotations = []; clearRefute(); redrawAll();
   document.getElementById("movelog").style.display = "none";
   const b = band();
-  const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
+  const pinned = new URLSearchParams(location.search).get("puzzle");
+  const url = pinned ? `/api/puzzle?id=${encodeURIComponent(pinned)}`
+                     : `/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`;
+  const r = await fetch(url);
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
   puzzle = await r.json();
   game = new Chess(puzzle.fen);
@@ -592,6 +595,12 @@ window.addEventListener("keydown", e => {
   if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
   if (e.key === "ArrowLeft") { e.preventDefault(); showHist(histIdx - 1); }
   else if (e.key === "ArrowRight") { e.preventDefault(); showHist(histIdx + 1); }
+});
+
+// Hook de test (lecture seule de l'état interne pour les tests E2E).
+window.__cm = () => ({
+  histIdx, explore, solved, ply, histLen: history.length,
+  puzzleId: puzzle && puzzle.id,
 });
 
 loadPuzzle();

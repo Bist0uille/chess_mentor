@@ -16,10 +16,12 @@ app = FastAPI(title="Chess Mentor — coach de raisonnement")
 
 
 @app.get("/api/puzzle")
-def get_puzzle(min_rating: int = 600, max_rating: int = 2200, min_plies: int = 0):
+def get_puzzle(min_rating: int = 600, max_rating: int = 2200, min_plies: int = 0,
+               id: str | None = None):
     if not db.db_exists():
         raise HTTPException(503, "Base absente. Lance d'abord scripts/build_db.py.")
-    puz = db.random_puzzle(min_rating, max_rating, min_plies)
+    # id explicite (lien partageable / tests déterministes) sinon tirage aléatoire.
+    puz = db.get_puzzle(id) if id else db.random_puzzle(min_rating, max_rating, min_plies)
     if not puz:
         raise HTTPException(404, "Aucun puzzle dans ces critères.")
     board, solution = coach.position_to_solve(puz["fen"], puz["moves"])
