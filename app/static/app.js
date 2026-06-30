@@ -21,7 +21,7 @@ let histIdx = 0;          // index courant dans l'historique
 let explore = false;      // mode exploration libre (après résolution)
 
 const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
-const REFUTE_COLOR = "rgba(136,32,32,0.70)";   // rouge Lichess #882020, translucide
+const REFUTE_COLOR = "#882020";   // rouge Lichess, opaque (couleur uniforme, sans superposition)
 
 // Notation française des pièces côté client (K→R, Q→D, R→T, B→F, N→C).
 function frSan(s) {
@@ -34,7 +34,7 @@ function band() {
 }
 
 const NS = "http://www.w3.org/2000/svg";
-const ARROW_COLOR = "rgba(21,120,27,0.70)";   // vert Lichess #15781B, translucide
+const ARROW_COLOR = "#15781B";   // vert Lichess, opaque (couleur uniforme, sans superposition)
 
 const $status = document.getElementById("status");
 const $meta = document.getElementById("meta");
