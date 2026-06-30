@@ -1,4 +1,4 @@
-# ♟️ Chess Mentor — coach de raisonnement
+# <img src="app/static/icon-180.png" alt="" width="32" align="top"> Chess Mentor — coach de raisonnement
 
 ### 👉 Démo en ligne : **https://chess-mentor-ten.vercel.app**
 
