@@ -14,7 +14,10 @@ from . import signal_detectors as sd
 # Haiku par défaut : la reformulation d'indices ancrés ne nécessite pas Opus,
 # et c'est ~20x moins cher. Surchargé par la variable d'env CHESS_COACH_MODEL.
 MODEL = os.environ.get("CHESS_COACH_MODEL", "claude-haiku-4-5")
-MAX_TOKENS = int(os.environ.get("CHESS_COACH_MAX_TOKENS", "600"))
+# Sortie plafonnée pour garantir le coût : avec Haiku, ~0,2 centime/puzzle
+# (≈ 5× sous l'objectif de 1 centime). NB : avec Opus le coût frôle 1 centime —
+# garder Haiku pour respecter le budget.
+MAX_TOKENS = int(os.environ.get("CHESS_COACH_MAX_TOKENS", "500"))
 
 # Cache mémoire des indices par puzzle (évite de rappeler l'API à chaque niveau)
 _HINT_CACHE: dict = {}
