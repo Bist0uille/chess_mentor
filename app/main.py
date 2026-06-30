@@ -82,6 +82,16 @@ class HintReq(BaseModel):
     target_elo: int | None = None
 
 
+@app.get("/api/solution")
+def get_solution(id: str):
+    """Ligne complète (coups solveur + réponses adverses) pour le rejeu visuel."""
+    puz = db.get_puzzle(id)
+    if not puz:
+        raise HTTPException(404, "Puzzle introuvable.")
+    board, solution = coach.position_to_solve(puz["fen"], puz["moves"])
+    return {"uci": solution, "san": coach.solution_san(board, solution)}
+
+
 @app.post("/api/hint")
 def post_hint(req: HintReq):
     puz = db.get_puzzle(req.id)

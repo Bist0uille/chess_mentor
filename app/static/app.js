@@ -112,9 +112,30 @@ async function nextHint() {
   $hints.appendChild(li);
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function showSolution() {
-  if (!puzzle) return;
-  while (hintLevel < 4) await nextHint();
+  if (!puzzle || busy) return;
+  busy = true; solved = true;
+  try {
+    const r = await fetch(`/api/solution?id=${encodeURIComponent(puzzle.id)}`);
+    const data = await r.json();
+    $line.textContent = data.san.join("  ");
+    $lineWrap.style.display = "block";
+    setStatus("Rejeu de la solution…", "");
+    // Rejoue toute la ligne depuis la position de départ, sur l'échiquier.
+    const g = new Chess(puzzle.fen);
+    board.position(puzzle.fen);
+    await sleep(500);
+    for (const uci of data.uci) {
+      g.move(uciToObj(uci));
+      board.position(g.fen());
+      await sleep(650);
+    }
+    setStatus("Solution rejouée.", "ok");
+  } finally {
+    busy = false;
+  }
 }
 
 function escapeHtml(s) {
