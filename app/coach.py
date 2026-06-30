@@ -4,6 +4,7 @@ avec repli sur des gabarits déterministes si aucune clé API n'est disponible.
 """
 import json
 import os
+import re
 from typing import List
 
 import chess
@@ -133,6 +134,29 @@ def _template_hints(board, signals, sans, sol_uci, themes) -> List[str]:
     return [h1, h2, h3, h4]
 
 
+# Détecte un « coup » SAN explicite (pièce, capture, roque, promotion) — pas une
+# simple case (« e6 ») ni une poussée de pion (« b3 »), pour ne pas sur-rejeter.
+_MOVE_RE = re.compile(
+    r"O-O-O|O-O|[RDTFC][a-h]?[1-8]?x?[a-h][1-8](?:=[RDTF])?[+#]?"
+    r"|[a-h]x[a-h][1-8](?:=[RDTF])?[+#]?|[a-h][1-8]=[RDTF][+#]?"
+)
+
+
+def _norm_move(s: str) -> str:
+    return s.replace("+", "").replace("#", "").replace("x", "").replace("=", "").strip()
+
+
+def _hints_consistent(hints: List[str], sans: List[str]) -> bool:
+    """Vrai si AUCUN coup cité dans les indices n'est absent de la solution.
+    Garde-fou anti-hallucination du LLM (ex. inventer un mat inexistant)."""
+    allowed = {_norm_move(s) for s in sans}
+    for tok in _MOVE_RE.findall(" ".join(hints)):
+        if _norm_move(tok) not in allowed:
+            print(f"[coach] indice LLM incohérent (coup '{tok}' hors solution) → repli")
+            return False
+    return True
+
+
 def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str]:
     """Demande à Claude de mettre les SIGNAUX VÉRIFIÉS en mots façon coach."""
     import anthropic
@@ -170,7 +194,9 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
         "indices_factuels_verifies_a_reformuler": base,
         "solution_notation_francaise": sans,
         "consigne": "Réécris ces 4 indices en vrai coach (tutoiement), en respectant "
-                    "strictement la base et la progression ci-dessus.",
+                    "strictement la base et la progression ci-dessus. INTERDIT : citer "
+                    "un coup (notation) absent de solution_notation_francaise — n'invente "
+                    "jamais de mat, d'échec ou de capture qui n'y figure pas.",
     }
     schema = {
         "type": "object",
@@ -197,9 +223,10 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
           f"~${cost:.5f} (~{cost * 92:.3f} centimes EUR)")
     text = next(b.text for b in resp.content if b.type == "text")
     hints = json.loads(text)["hints"]
-    if len(hints) < 4:
-        hints += explain.build_hints(board, sol_uci, themes, target_elo,
-                                     signals)[len(hints):]
+    # Garde-fou : si le LLM cite un coup hors solution (hallucination), on jette
+    # tout et on rend les indices déterministes (corrects).
+    if len(hints) < 4 or not _hints_consistent(hints, sans):
+        return base
     return hints[:4]
 
 
