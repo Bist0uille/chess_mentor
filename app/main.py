@@ -124,6 +124,36 @@ def get_all_hints(id: str, target_elo: int | None = None):
     return {"hints": coach.get_hints(puz, target)}
 
 
+@app.get("/api/diag")
+def diag():
+    """Diagnostic temporaire de l'activation du narrateur (sans exposer la clé)."""
+    info = {
+        "llm_flag": os.environ.get("CHESS_COACH_LLM"),
+        "key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "model": coach.MODEL,
+    }
+    if not (info["llm_flag"] or "").lower() in ("on", "1", "true", "yes"):
+        info["verdict"] = "CHESS_COACH_LLM n'est pas 'on' → gabarits"
+        return info
+    if not info["key_set"]:
+        info["verdict"] = "ANTHROPIC_API_KEY absente → gabarits"
+        return info
+    try:
+        import anthropic
+        r = anthropic.Anthropic().messages.create(
+            model=coach.MODEL, max_tokens=20,
+            messages=[{"role": "user", "content": "Réponds: OK"}],
+        )
+        info["call_ok"] = True
+        info["sample"] = next((b.text for b in r.content if b.type == "text"), "")
+        info["verdict"] = "OK : Haiku devrait fonctionner"
+    except Exception as e:
+        info["call_ok"] = False
+        info["error"] = f"{type(e).__name__}: {e}"
+        info["verdict"] = "appel API en échec → gabarits"
+    return info
+
+
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC, "index.html"))
