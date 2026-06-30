@@ -8,6 +8,7 @@ from typing import List
 
 import chess
 
+from . import explain
 from . import signal_detectors as sd
 
 # Haiku par défaut : la reformulation d'indices ancrés ne nécessite pas Opus,
@@ -192,7 +193,8 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     text = next(b.text for b in resp.content if b.type == "text")
     hints = json.loads(text)["hints"]
     if len(hints) < 4:
-        hints += _template_hints(board, signals, sans, sol_uci, themes)[len(hints):]
+        hints += explain.build_hints(board, sol_uci, themes, target_elo,
+                                     signals)[len(hints):]
     return hints[:4]
 
 
@@ -214,10 +216,10 @@ def get_hints(puzzle: dict, target_elo: int) -> List[str]:
         try:
             hints = _claude_hints(board, signals, sans, sol_uci, themes, target_elo)
         except Exception as e:  # repli robuste si l'API échoue
-            print(f"[coach] repli templates (erreur API : {e})")
-            hints = _template_hints(board, signals, sans, sol_uci, themes)
+            print(f"[coach] repli déterministe (erreur API : {e})")
+            hints = explain.build_hints(board, sol_uci, themes, target_elo, signals)
     else:
-        hints = _template_hints(board, signals, sans, sol_uci, themes)
+        hints = explain.build_hints(board, sol_uci, themes, target_elo, signals)
 
     _HINT_CACHE[pid] = hints
     return hints

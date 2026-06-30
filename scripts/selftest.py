@@ -69,10 +69,29 @@ def test_perfect_player():
     return solved == len(rows)
 
 
+def test_hints_robustness():
+    """Les 4 indices déterministes se génèrent sans erreur sur toute la base."""
+    print("== Robustesse des indices déterministes ==")
+    con = sqlite3.connect(db.DB_PATH)
+    con.row_factory = sqlite3.Row
+    rows = [dict(r) for r in con.execute("SELECT * FROM puzzles").fetchall()]
+    ok = 0
+    for p in rows:
+        try:
+            h = coach.get_hints(p, 1200)
+            if len(h) == 4 and all(isinstance(x, str) and x for x in h):
+                ok += 1
+        except Exception:
+            pass
+    print(f"  {ok}/{len(rows)} puzzles → 4 indices valides")
+    return ok == len(rows)
+
+
 if __name__ == "__main__":
     if not db.db_exists():
         sys.exit("Base absente : lance d'abord scripts/build_db.py")
     ok1 = test_detectors_cover_themes()
     ok2 = test_perfect_player()
-    print("\nRésultat :", "TOUT VERT ✅" if (ok1 and ok2) else "ÉCHEC ❌")
-    sys.exit(0 if (ok1 and ok2) else 1)
+    ok3 = test_hints_robustness()
+    print("\nRésultat :", "TOUT VERT ✅" if (ok1 and ok2 and ok3) else "ÉCHEC ❌")
+    sys.exit(0 if (ok1 and ok2 and ok3) else 1)
