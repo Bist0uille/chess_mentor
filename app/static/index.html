@@ -32,9 +32,26 @@
     <h1>♟️ Coach de raisonnement — repère les signaux faibles</h1>
 
     <div>
-      <div id="board"></div>
+      <div id="board" style="position:relative"></div>
+      <div id="promo" style="display:none;position:absolute;z-index:30;background:#fff;
+           border:1px solid #c9b;border-radius:8px;padding:6px;box-shadow:0 4px 12px #0003">
+        <div style="font-size:.8rem;margin-bottom:4px;color:#555">Promotion :</div>
+        <button data-p="q">♛ Dame</button>
+        <button data-p="r">♜ Tour</button>
+        <button data-p="b">♝ Fou</button>
+        <button data-p="n">♞ Cavalier</button>
+      </div>
       <div class="meta" id="meta">Chargement…</div>
       <div class="controls">
+        <label style="font-size:.9rem">Niveau :
+          <select id="level" style="padding:6px;border-radius:6px">
+            <option value="600-1000">Débutant (600–1000)</option>
+            <option value="1000-1400" selected>Intermédiaire (1000–1400)</option>
+            <option value="1400-1800">Avancé (1400–1800)</option>
+            <option value="1800-2200">Expert (1800–2200)</option>
+          </select>
+        </label>
+        <br>
         <button id="new">Nouveau puzzle</button>
         <button id="hint">Indice suivant</button>
         <button id="solution">Voir la solution</button>

@@ -13,6 +13,12 @@ let selected = null;      // case sélectionnée (clic gauche)
 let annotStart = null;    // case de départ d'une flèche en cours
 let centers = {};         // case -> {x,y} en px relatifs à #board
 let sqSize = 50;
+let lastMove = [];        // cases du dernier coup joué (surbrillance)
+
+function band() {
+  const [lo, hi] = document.getElementById("level").value.split("-").map(Number);
+  return { min: lo, max: hi, elo: Math.round((lo + hi) / 2) };
+}
 
 const NS = "http://www.w3.org/2000/svg";
 const ARROW_COLOR = "rgba(21,120,27,0.78)";
@@ -43,9 +49,10 @@ async function loadPuzzle() {
   setStatus("Chargement…", "");
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
-  hintLevel = 0; ply = 0; solved = false;
+  hintLevel = 0; ply = 0; solved = false; lastMove = [];
   clearSelection(); annotations = []; redrawAll();
-  const r = await fetch("/api/puzzle");
+  const b = band();
+  const r = await fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`);
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
   puzzle = await r.json();
   game = new Chess(puzzle.fen);
@@ -85,8 +92,40 @@ function tryMove(source, target) {
   const probe = new Chess(game.fen());
   const mv = probe.move({ from: source, to: target, promotion: "q" });
   if (mv === null) return false;
+  if (mv.flags.includes("p")) {        // promotion : on demande la pièce
+    choosePromotion(target).then(letter => {
+      if (!letter) { board.position(game.fen()); return; }  // annulé
+      validate(source + target + letter);
+    });
+    return true;
+  }
   validate(mv.from + mv.to + (mv.promotion || ""));
   return true;
+}
+
+function choosePromotion(target) {
+  const promo = document.getElementById("promo");
+  const c = centers[target];
+  const brect = $boardEl.getBoundingClientRect();
+  promo.style.position = "fixed";
+  if (c) {
+    promo.style.left = (brect.left + Math.min(c.x, brect.width - 110)) + "px";
+    promo.style.top = (brect.top + Math.max(0, c.y - 30)) + "px";
+  }
+  promo.style.display = "block";
+  return new Promise(resolve => {
+    function cleanup(letter) {
+      promo.style.display = "none";
+      promo.querySelectorAll("button").forEach(b => (b.onclick = null));
+      document.removeEventListener("mousedown", outside, true);
+      resolve(letter);
+    }
+    function outside(e) { if (!promo.contains(e.target)) cleanup(null); }
+    promo.querySelectorAll("button").forEach(b => {
+      b.onclick = () => cleanup(b.getAttribute("data-p"));
+    });
+    setTimeout(() => document.addEventListener("mousedown", outside, true), 0);
+  });
 }
 
 async function validate(uci) {
@@ -105,8 +144,13 @@ async function validate(uci) {
       return;
     }
     game.move(uciToObj(uci));
-    if (data.opponent_uci) game.move(uciToObj(data.opponent_uci));
+    lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
+    if (data.opponent_uci) {
+      game.move(uciToObj(data.opponent_uci));
+      lastMove.push(data.opponent_uci.slice(0, 2), data.opponent_uci.slice(2, 4));
+    }
     board.position(game.fen());
+    drawLastMove();
     ply = data.next_ply;
     updateProgress();
     if (data.done) {
@@ -136,7 +180,7 @@ function setupOverlay() {
     `<defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4"
        markerHeight="4" orient="auto-start-reverse">
        <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker></defs>
-     <g id="g-hints"></g><g id="g-annot"></g>`;
+     <g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
   $boardEl.style.position = "relative";
   $boardEl.appendChild(svg);
   computeCenters();
@@ -230,7 +274,14 @@ function toggleAnnotation(from, to) {
   drawAnnot();
 }
 
-function redrawAll() { drawHints(); drawAnnot(); }
+function redrawAll() { drawLastMove(); drawHints(); drawAnnot(); }
+
+function drawLastMove() {
+  const g = document.getElementById("g-lastmove");
+  if (!g) return;
+  g.innerHTML = "";
+  for (const sq of lastMove) rectHighlight(g, sq, "rgba(255,221,0,0.32)");
+}
 
 function drawHints() {
   const g = document.getElementById("g-hints");
@@ -309,7 +360,7 @@ async function nextHint() {
   hintLevel += 1;
   const r = await fetch("/api/hint", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: puzzle.id, level: hintLevel }),
+    body: JSON.stringify({ id: puzzle.id, level: hintLevel, target_elo: band().elo }),
   });
   const data = await r.json();
   const li = document.createElement("li");

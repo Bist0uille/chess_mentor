@@ -27,7 +27,7 @@ def get_puzzle(min_rating: int = 600, max_rating: int = 2200, min_plies: int = 0
         "id": puz["id"],
         "fen": board.fen(),  # position À RÉSOUDRE (1er coup adverse déjà joué)
         "rating": puz["rating"],
-        "themes": (puz["themes"] or "").split(),
+        "themes": coach.themes_fr(puz["themes"]),
         "side_to_move": "w" if board.turn == chess.WHITE else "b",
         "n_solver_moves": (len(solution) + 1) // 2,  # nombre de coups à trouver
     }
@@ -65,14 +65,14 @@ def post_attempt(a: Attempt):
         reply = solution[idx + 1]
         reply_move = chess.Move.from_uci(reply)
         result["opponent_uci"] = reply
-        result["opponent_san"] = board.san(reply_move)
+        result["opponent_san"] = coach.to_french_san(board.san(reply_move))
         board.push(reply_move)
     # Fini s'il ne reste plus de coup solveur après celui-ci.
     result["done"] = (idx + 2) >= len(solution)
     if result["done"]:
         # Ligne complète en SAN pour l'affichage final.
         b2, sol = coach.position_to_solve(puz["fen"], puz["moves"])
-        result["line_san"] = coach.solution_san(b2, sol)
+        result["line_san"] = coach.solution_san_fr(b2, sol)
     return result
 
 
@@ -89,7 +89,7 @@ def get_solution(id: str):
     if not puz:
         raise HTTPException(404, "Puzzle introuvable.")
     board, solution = coach.position_to_solve(puz["fen"], puz["moves"])
-    return {"uci": solution, "san": coach.solution_san(board, solution)}
+    return {"uci": solution, "san": coach.solution_san_fr(board, solution)}
 
 
 @app.post("/api/hint")

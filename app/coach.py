@@ -15,6 +15,49 @@ MODEL = os.environ.get("CHESS_COACH_MODEL", "claude-opus-4-8")
 # Cache mémoire des indices par puzzle (évite de rappeler l'API à chaque niveau)
 _HINT_CACHE: dict = {}
 
+# Notation française des pièces : K→R, Q→D, R→T, B→F, N→C (les fichiers a-h restent).
+_SAN_FR = str.maketrans({"K": "R", "Q": "D", "R": "T", "B": "F", "N": "C"})
+
+# Traduction des thèmes Lichess (anglais) vers le français.
+THEME_FR = {
+    "fork": "fourchette", "pin": "clouage", "skewer": "enfilade",
+    "hangingPiece": "pièce en prise", "trappedPiece": "pièce piégée",
+    "discoveredAttack": "attaque à la découverte", "doubleCheck": "échec double",
+    "sacrifice": "sacrifice", "deflection": "déviation", "attraction": "attraction",
+    "clearance": "dégagement", "interference": "interception",
+    "capturingDefender": "élimination du défenseur", "overloading": "surcharge",
+    "backRankMate": "mat du couloir", "smotheredMate": "mat étouffé",
+    "bodenMate": "mat de Boden", "doubleBishopMate": "mat des deux fous",
+    "hookMate": "mat en hameçon", "arabianMate": "mat arabe",
+    "anastasiaMate": "mat d'Anastasie", "killBoxMate": "mat de la boîte",
+    "mate": "mat", "mateIn1": "mat en 1", "mateIn2": "mat en 2",
+    "mateIn3": "mat en 3", "mateIn4": "mat en 4", "mateIn5": "mat en 5",
+    "advancedPawn": "pion avancé", "promotion": "promotion",
+    "enPassant": "prise en passant", "castling": "roque",
+    "exposedKing": "roi exposé", "kingsideAttack": "attaque sur l'aile roi",
+    "queensideAttack": "attaque sur l'aile dame", "zugzwang": "zugzwang",
+    "quietMove": "coup tranquille", "defensiveMove": "coup défensif",
+    "intermezzo": "coup intermédiaire", "xRayAttack": "attaque en rayon X",
+    "doubleAttack": "double attaque", "attackingF2F7": "attaque en f2/f7",
+    "opening": "ouverture", "middlegame": "milieu de partie", "endgame": "finale",
+    "rookEndgame": "finale de tours", "pawnEndgame": "finale de pions",
+    "queenEndgame": "finale de dames", "bishopEndgame": "finale de fous",
+    "knightEndgame": "finale de cavaliers", "queenRookEndgame": "finale dame et tour",
+    "crushing": "écrasant", "advantage": "avantage", "equality": "égalité",
+    "short": "court", "long": "long", "veryLong": "très long", "oneMove": "un coup",
+    "master": "niveau maître", "masterVsMaster": "maître contre maître",
+    "superGM": "super grand maître",
+}
+
+
+def to_french_san(san: str) -> str:
+    return san.translate(_SAN_FR)
+
+
+def themes_fr(themes: str) -> list:
+    """Thèmes Lichess (chaîne) -> liste de libellés français (inconnus ignorés)."""
+    return [THEME_FR[t] for t in (themes or "").split() if t in THEME_FR]
+
 
 def position_to_solve(fen: str, moves_uci: str):
     """Joue le 1er coup (celui de l'adversaire) pour obtenir la position à résoudre.
@@ -51,10 +94,14 @@ def solution_san(board: chess.Board, solution_uci: List[str]) -> List[str]:
     return sans
 
 
+def solution_san_fr(board: chess.Board, solution_uci: List[str]) -> List[str]:
+    return [to_french_san(s) for s in solution_san(board, solution_uci)]
+
+
 def _first_solver_move_san(board: chess.Board, solution_uci: List[str]) -> str:
     if not solution_uci:
         return "?"
-    return board.san(chess.Move.from_uci(solution_uci[0]))
+    return to_french_san(board.san(chess.Move.from_uci(solution_uci[0])))
 
 
 def _target_square(solution_uci: List[str]) -> str:
@@ -87,18 +134,22 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     first_san = _first_solver_move_san(board, sol_uci)
 
     system = (
-        "Tu es un entraîneur d'échecs. Ton rôle : apprendre à RAISONNER, pas à "
-        "mémoriser. Tu reçois des SIGNAUX déjà vérifiés par un moteur déterministe "
-        "et la solution. Règle absolue : n'affirme QUE ce qui figure dans les "
-        "signaux ou la solution fournis ; n'invente aucun coup, aucune pièce, aucune "
-        "case. Réponds en français."
+        "Tu es un entraîneur d'échecs francophone. Ton rôle : apprendre à RAISONNER, "
+        "pas à mémoriser. Tu reçois des SIGNAUX déjà vérifiés par un moteur "
+        "déterministe et la solution. Règles absolues :\n"
+        "1. N'affirme QUE ce qui figure dans les signaux ou la solution fournis ; "
+        "n'invente aucun coup, aucune pièce, aucune case.\n"
+        "2. Écris en français à 100 % — aucun mot anglais, y compris pour les "
+        "thèmes (dis « fourchette », pas « fork »).\n"
+        "3. Utilise la notation française des pièces : R (roi), D (dame), T (tour), "
+        "F (fou), C (cavalier). Jamais K/Q/R/B/N."
     )
     user = {
         "trait": side,
         "niveau_cible_elo": target_elo,
         "signaux_verifies": facts,
-        "themes_lichess": themes.split() if themes else [],
-        "solution_san": sans,
+        "themes": themes_fr(themes),
+        "solution_notation_francaise": sans,
         "premier_coup_san": first_san,
         "consigne": (
             "Produis exactement 4 indices progressifs, du plus vague au plus précis, "
@@ -141,7 +192,7 @@ def get_hints(puzzle: dict, target_elo: int) -> List[str]:
 
     board, sol_uci = position_to_solve(puzzle["fen"], puzzle["moves"])
     signals = sd.detect_all(board)
-    sans = solution_san(board, sol_uci)
+    sans = solution_san_fr(board, sol_uci)  # notation française pour l'affichage
     themes = puzzle.get("themes", "") or ""
 
     if os.environ.get("ANTHROPIC_API_KEY"):
