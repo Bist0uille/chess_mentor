@@ -360,6 +360,8 @@ function showHist(idx) {
   const h = history[histIdx];
   clearSelection();
   clearRefute();              // efface l'analyse précédente en naviguant
+  annotations = [];           // efface les flèches dessinées
+  drawAnnot();                // vide réellement la couche (flèche moteur + flèches)
   board.position(h.fen);
   lastMove = h.lastMove.slice();
   drawLastMove();
