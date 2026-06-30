@@ -21,7 +21,7 @@ let histIdx = 0;          // index courant dans l'historique
 let explore = false;      // mode exploration libre (après résolution)
 
 const engine = new Engine("/static/lozza.js");  // moteur d'échecs (navigateur)
-const REFUTE_COLOR = "rgba(179,38,30,0.85)";
+const REFUTE_COLOR = "rgba(136,32,32,0.70)";   // rouge Lichess #882020, translucide
 
 // Notation française des pièces côté client (K→R, Q→D, R→T, B→F, N→C).
 function frSan(s) {
@@ -34,7 +34,7 @@ function band() {
 }
 
 const NS = "http://www.w3.org/2000/svg";
-const ARROW_COLOR = "rgba(21,120,27,0.78)";
+const ARROW_COLOR = "rgba(21,120,27,0.70)";   // vert Lichess #15781B, translucide
 
 const $status = document.getElementById("status");
 const $meta = document.getElementById("meta");
@@ -237,14 +237,12 @@ function setupOverlay() {
   // marqueur de pointe de flèche
   svg.innerHTML =
     `<defs>
-       <marker id="ah" viewBox="0 0 10 10" refX="7.2" refY="5" markerWidth="4.4"
-         markerHeight="4.4" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 L3.4,5 z" fill="${ARROW_COLOR}"
-           stroke="${ARROW_COLOR}" stroke-width="1.1" stroke-linejoin="round"/></marker>
-       <marker id="ahr" viewBox="0 0 10 10" refX="7.2" refY="5" markerWidth="4.4"
-         markerHeight="4.4" orient="auto-start-reverse">
-         <path d="M0,0 L10,5 L0,10 L3.4,5 z" fill="${REFUTE_COLOR}"
-           stroke="${REFUTE_COLOR}" stroke-width="1.1" stroke-linejoin="round"/></marker>
+       <marker id="ah" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="3.6"
+         markerHeight="3.6" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 z" fill="${ARROW_COLOR}"/></marker>
+       <marker id="ahr" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="3.6"
+         markerHeight="3.6" orient="auto-start-reverse">
+         <path d="M0,0 L10,5 L0,10 z" fill="${REFUTE_COLOR}"/></marker>
      </defs>
      <g id="g-lastmove"></g><g id="g-hints"></g><g id="g-annot"></g>`;
   $boardEl.style.position = "relative";
@@ -522,13 +520,13 @@ function drawArrow(g, from, to, color, marker) {
   if (!a0 || !b0) return;
   const dx = b0.x - a0.x, dy = b0.y - a0.y;
   const len = Math.hypot(dx, dy) || 1;
-  const shrink = sqSize * 0.34;
+  const shrink = sqSize * 0.46;
   const ex = b0.x - (dx / len) * shrink, ey = b0.y - (dy / len) * shrink;
   const line = document.createElementNS(NS, "line");
   line.setAttribute("x1", a0.x); line.setAttribute("y1", a0.y);
   line.setAttribute("x2", ex); line.setAttribute("y2", ey);
   line.setAttribute("stroke", color);
-  line.setAttribute("stroke-width", sqSize * 0.15);
+  line.setAttribute("stroke-width", sqSize * 0.20);
   line.setAttribute("stroke-linecap", "round");
   line.setAttribute("stroke-linejoin", "round");
   line.setAttribute("marker-end", `url(#${marker})`);
@@ -544,10 +542,10 @@ function drawAnnot() {
       const c = centers[a.from]; if (!c) continue;
       const circ = document.createElementNS(NS, "circle");
       circ.setAttribute("cx", c.x); circ.setAttribute("cy", c.y);
-      circ.setAttribute("r", sqSize * 0.45);
+      circ.setAttribute("r", sqSize * 0.42);
       circ.setAttribute("fill", "none");
       circ.setAttribute("stroke", ARROW_COLOR);
-      circ.setAttribute("stroke-width", sqSize * 0.07);
+      circ.setAttribute("stroke-width", sqSize * 0.05);
       g.appendChild(circ);
     } else {
       drawArrow(g, a.from, a.to, ARROW_COLOR, "ah");
