@@ -430,6 +430,7 @@ async function refute(uci) {
 
 function clearRefute() {
   refuteMove = null;
+  drawAnnot();                // efface réellement la flèche de réfutation du plateau
   const $r = document.getElementById("refute");
   if ($r) { $r.style.display = "none"; $r.className = "refute"; }
 }
