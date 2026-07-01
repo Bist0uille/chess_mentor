@@ -7,6 +7,7 @@ let hintLevel = 0;
 let solved = false;
 let busy = false;
 let loadToken = 0;        // génération : incrémentée à chaque « Nouveau » pour couper solution/indice en cours
+let prefetch = null;      // { key, promise } : prochain puzzle préchargé (endpoint DB, gratuit)
 
 // Annotations (clic droit) et sélection (clic gauche)
 let annotations = [];     // [{kind:'arrow'|'circle', from, to}]
@@ -70,13 +71,25 @@ async function loadPuzzle() {
   document.getElementById("movelog").style.display = "none";
   const b = band();
   const pinned = new URLSearchParams(location.search).get("puzzle");
-  const url = pinned ? `/api/puzzle?id=${encodeURIComponent(pinned)}`
-                     : `/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`;
-  const r = await fetch(url);
-  if (myToken !== loadToken) return;   // un « Nouveau » plus récent a supplanté ce chargement
-  if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
-  puzzle = await r.json();
-  if (myToken !== loadToken) return;
+  const bkey = `${b.min}-${b.max}`;
+  // Si le prochain puzzle a été préchargé (même tranche Elo), on l'utilise
+  // directement → « Nouveau » quasi instantané. Sinon fetch classique.
+  let puz = null;
+  if (!pinned && prefetch && prefetch.key === bkey) {
+    puz = await prefetch.promise;
+    prefetch = null;
+    if (myToken !== loadToken) return;
+  }
+  if (!puz) {
+    const url = pinned ? `/api/puzzle?id=${encodeURIComponent(pinned)}`
+                       : `/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`;
+    const r = await fetch(url);
+    if (myToken !== loadToken) return;   // un « Nouveau » plus récent a supplanté ce chargement
+    if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
+    puz = await r.json();
+    if (myToken !== loadToken) return;
+  }
+  puzzle = puz;
   game = new Chess(puzzle.fen);
   const orientation = puzzle.side_to_move === "w" ? "white" : "black";
   const trait = puzzle.side_to_move === "w" ? "Blancs" : "Noirs";
@@ -96,6 +109,21 @@ async function loadPuzzle() {
   updateEval(puzzle.fen);
   updateNav();
   renderMoveLog();
+  prefetchNext();   // prépare le prochain puzzle en tâche de fond (endpoint DB, gratuit)
+}
+
+// Précharge un puzzle de la tranche Elo courante pour que « Nouveau » soit
+// quasi instantané. Aucun coût API (l'endpoint /api/puzzle n'appelle pas le LLM).
+function prefetchNext() {
+  // pas de préchargement quand un puzzle est épinglé (lien partageable) :
+  // « Nouveau » recharge toujours le même id.
+  if (new URLSearchParams(location.search).get("puzzle")) { prefetch = null; return; }
+  const b = band();
+  const key = `${b.min}-${b.max}`;
+  const promise = fetch(`/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`)
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
+  prefetch = { key, promise };
 }
 
 /* ---------- coups (drag + clic) ---------- */

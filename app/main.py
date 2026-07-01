@@ -17,6 +17,17 @@ STATIC = os.path.join(HERE, "static")
 app = FastAPI(title="Chess Mentor — coach de raisonnement")
 
 
+@app.get("/api/health")
+def health():
+    """Endpoint ultra-léger (ni DB ni LLM) pour maintenir l'instance chaude.
+
+    À pinger périodiquement (cron Vercel Pro, ou pinger externe gratuit type
+    UptimeRobot toutes les ~5 min) afin d'éviter le cold start qui domine la
+    latence de la « réflexion du coach ». Ne consomme aucun crédit API Anthropic.
+    """
+    return {"ok": True}
+
+
 @app.get("/api/puzzle")
 def get_puzzle(min_rating: int = 600, max_rating: int = 2200, min_plies: int = 0,
                id: str | None = None):

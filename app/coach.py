@@ -17,8 +17,9 @@ from . import signal_detectors as sd
 MODEL = os.environ.get("CHESS_COACH_MODEL", "claude-haiku-4-5")
 # Sortie plafonnée pour garantir le coût : avec Haiku, ~0,2 centime/puzzle
 # (≈ 5× sous l'objectif de 1 centime). NB : avec Opus le coût frôle 1 centime —
-# garder Haiku pour respecter le budget.
-MAX_TOKENS = int(os.environ.get("CHESS_COACH_MAX_TOKENS", "500"))
+# garder Haiku pour respecter le budget. 350 suffit (4 indices courts ≈ 200 tokens)
+# et raccourcit un peu la génération.
+MAX_TOKENS = int(os.environ.get("CHESS_COACH_MAX_TOKENS", "350"))
 
 # Cache mémoire des indices par puzzle (évite de rappeler l'API à chaque niveau)
 _HINT_CACHE: dict = {}
@@ -151,6 +152,23 @@ def _norm_move(s: str) -> str:
     return s.replace("+", "").replace("#", "").replace("x", "").replace("=", "").strip()
 
 
+def _extract_hints_json(text: str) -> List[str]:
+    """Extrait la liste d'indices d'une réponse JSON en texte brut.
+
+    Tolère les clôtures markdown (``` / ```json) et les deux formes
+    {"hints": [...]} ou [...]. Lève une exception si le format est inexploitable
+    (le caller retombe alors sur les indices déterministes).
+    """
+    s = text.strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", s).strip()
+    data = json.loads(s)
+    hints = data["hints"] if isinstance(data, dict) else data
+    if not isinstance(hints, list):
+        raise ValueError("format JSON inattendu (ni objet .hints ni tableau)")
+    return [str(h).strip() for h in hints if str(h).strip()]
+
+
 def _hints_consistent(hints: List[str], sans: List[str]) -> bool:
     """Vrai si AUCUN coup cité dans les indices n'est absent de la solution.
     Garde-fou anti-hallucination du LLM (ex. inventer un mat inexistant)."""
@@ -202,24 +220,19 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
                     "strictement la base et la progression ci-dessus. INTERDIT : citer "
                     "un coup (notation) absent de solution_notation_francaise — n'invente "
                     "jamais de mat, d'échec ou de capture qui n'y figure pas.",
+        "format_reponse": "Réponds UNIQUEMENT avec un objet JSON "
+                          '{"hints": ["…", "…", "…", "…"]} (exactement 4 chaînes, '
+                          "dans l'ordre des 4 indices), sans aucun texte ni balise autour.",
     }
-    schema = {
-        "type": "object",
-        "properties": {
-            "hints": {
-                "type": "array",
-                "items": {"type": "string"},
-            }
-        },
-        "required": ["hints"],
-        "additionalProperties": False,
-    }
+    # Sortie en texte brut (JSON demandé dans la consigne) plutôt que décodage
+    # contraint json_schema : évite le surcoût de latence du mode structuré, la
+    # robustesse étant assurée par le parsing tolérant + repli déterministe.
     resp = client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
+        temperature=0.3,
         system=system,
         messages=[{"role": "user", "content": json.dumps(user, ensure_ascii=False)}],
-        output_config={"format": {"type": "json_schema", "schema": schema}},
     )
     u = resp.usage
     # Coût estimé (Haiku 4.5 : 1$/1M in, 5$/1M out). Visible dans les logs Vercel.
@@ -227,7 +240,11 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     print(f"[coach] {MODEL} in={u.input_tokens} out={u.output_tokens} "
           f"~${cost:.5f} (~{cost * 92:.3f} centimes EUR)")
     text = next(b.text for b in resp.content if b.type == "text")
-    hints = json.loads(text)["hints"]
+    try:
+        hints = _extract_hints_json(text)
+    except Exception as e:  # JSON illisible → repli déterministe (corrects)
+        print(f"[coach] parse JSON échoué → repli déterministe ({e})")
+        return base
     # Garde-fou : si le LLM cite un coup hors solution (hallucination), on jette
     # tout et on rend les indices déterministes (corrects).
     if len(hints) < 4 or not _hints_consistent(hints, sans):
