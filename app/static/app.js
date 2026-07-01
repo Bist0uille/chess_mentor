@@ -97,7 +97,7 @@ async function loadPuzzle() {
   const orientation = puzzle.side_to_move === "w" ? "white" : "black";
   const trait = puzzle.side_to_move === "w" ? "Blancs" : "Noirs";
   $meta.innerHTML = `Trait aux <b>${trait}</b> · rating ${puzzle.rating}`;
-  $themes.innerHTML = `<b>Thèmes :</b> ${(puzzle.themes || []).join(", ") || "—"}`;
+  $themes.innerHTML = "";   // thèmes cachés jusqu'à la résolution (évite de spoiler le motif)
   history = [{ fen: puzzle.fen, lastMove: [], explain: "" }];
   histIdx = 0;
   if (board) board.destroy();
@@ -252,6 +252,7 @@ async function validate(uci) {
     if (data.done) {
       solved = true; explore = true;  // exploration libre de la suite (bonus, silencieux)
       setStatus("✅ Résolu !", "ok");
+      revealThemes();                 // récap des thèmes travaillés
       if (data.line_san) { $line.textContent = data.line_san.join("  ");
                            $lineWrap.style.display = "block"; }
     } else {
@@ -611,6 +612,14 @@ function drawAnnot() {
   if (refuteMove) drawArrow(g, refuteMove.from, refuteMove.to, REFUTE_COLOR);
 }
 
+// Révèle les thèmes du puzzle en récap, une fois résolu (ou solution affichée).
+// Cachés pendant la résolution pour ne pas spoiler le motif (« Mat en 2 »…).
+function revealThemes() {
+  if (!puzzle) return;
+  const t = (puzzle.themes || []).join(", ");
+  $themes.innerHTML = t ? `<b>Tu viens de travailler :</b> ${escapeHtml(t)}` : "";
+}
+
 /* ---------- indices & solution ---------- */
 const HINT_MAX = 3;  // 3 indices ; le 3e débloque sans donner le coup
 
@@ -704,6 +713,7 @@ async function showSolution() {
     }
     explore = true;  // exploration libre après le rejeu (bonus, silencieux)
     setStatus("Solution affichée.", "ok");
+    revealThemes();  // récap des thèmes travaillés
   } finally { if (myToken === loadToken) busy = false; }
 }
 
