@@ -641,7 +641,10 @@ function escapeHtml(s) {
 }
 
 document.getElementById("new").onclick = loadPuzzle;
-document.getElementById("level").onchange = loadPuzzle;   // changer de niveau = nouveau problème
+document.getElementById("level").onchange = () => {       // changer de niveau = nouveau problème
+  saveLevel();                                            // mémorise le niveau pour la prochaine visite
+  loadPuzzle();
+};
 document.getElementById("hint").onclick = nextHint;
 document.getElementById("solution").onclick = showSolution;
 document.getElementById("navStart").onclick = () => showHist(0);
@@ -708,4 +711,20 @@ window.__cm = () => ({
   puzzleId: puzzle && puzzle.id,
 });
 
+// Mémorisation du niveau choisi (persiste entre les visites) --------------
+const LEVEL_KEY = "cm_level";
+function saveLevel() {
+  try { localStorage.setItem(LEVEL_KEY, document.getElementById("level").value); }
+  catch (e) { /* localStorage indisponible (navigation privée) : on ignore */ }
+}
+function restoreLevel() {
+  let saved = null;
+  try { saved = localStorage.getItem(LEVEL_KEY); } catch (e) { /* ignore */ }
+  if (!saved) return;
+  const sel = document.getElementById("level");
+  // ne restaure que si l'option existe encore (sinon on garde la valeur par défaut du HTML)
+  if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+
+restoreLevel();
 loadPuzzle();
