@@ -271,6 +271,8 @@ function bindBoardEvents() {
   if (eventsBound) return;
   eventsBound = true;
 
+  let lastTouchTs = 0;   // horodatage du dernier toucher, pour ignorer le mousedown synthétique qui suit
+
   // bloque le menu contextuel sur l'échiquier
   $boardEl.addEventListener("contextmenu", e => e.preventDefault());
 
@@ -283,12 +285,10 @@ function bindBoardEvents() {
     }
   }, true);
 
-  // clic GAUCHE : sélection / clic-pour-jouer (+ efface les annotations)
-  $boardEl.addEventListener("mousedown", e => {
-    if (e.button !== 0) return;
+  // sélection / clic-pour-jouer, logique partagée souris (bureau) + tactile (mobile)
+  function handleBoardPress(sq) {
     if (annotations.length || refuteMove) { annotations = []; refuteMove = null; drawAnnot(); }
     if (!explore && reviewing()) { clearSelection(); return; }  // revue (résolution) : pas de jeu
-    const sq = squareFromEvent(e);
     if (!sq) { clearSelection(); return; }
     if (selected && sq === selected) { clearSelection(); return; }  // re-clic = désélection
     if (selected && isLegalDest(selected, sq)) {
@@ -299,11 +299,25 @@ function bindBoardEvents() {
     const cg = curChess();
     const piece = cg && cg.get(sq);
     if (piece && piece.color === cg.turn() && (explore || !solved)) {
-      selectSquare(sq);
+      selectSquare(sq);   // affiche les cases de déplacement possibles
     } else {
       clearSelection();
     }
+  }
+
+  // clic GAUCHE (bureau)
+  $boardEl.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    if (Date.now() - lastTouchTs < 700) return;   // ignore le mousedown synthétique issu d'un toucher
+    handleBoardPress(squareFromEvent(e));
   });
+
+  // appui TACTILE (mobile) : chessboard.js supprime les événements souris synthétiques,
+  // on gère donc nous-mêmes la sélection pour afficher les cases de déplacement au toucher
+  $boardEl.addEventListener("touchstart", e => {
+    lastTouchTs = Date.now();
+    handleBoardPress(squareFromEvent(e));
+  }, { passive: true });
 
   // relâchement clic DROIT : termine la flèche / pose un cercle
   window.addEventListener("mouseup", e => {
