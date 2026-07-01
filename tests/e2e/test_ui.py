@@ -41,9 +41,10 @@ def _drag(page, frm, to):
 
 def test_page_loads(page, server_url):
     page.goto(server_url)
+    page.wait_for_function("window.__cm && window.__cm().puzzleId")  # un puzzle est chargé
     page.wait_for_selector("#board [data-square]")
-    assert "À toi de jouer" in page.locator("#status").inner_text()
     assert page.locator("#board [data-square]").count() == 64
+    assert "Trait aux" in page.locator("#meta").inner_text()  # méta du puzzle affichée
 
 
 def test_solve_mate_in_one(page, server_url, all_puzzles):

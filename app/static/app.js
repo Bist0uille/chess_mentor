@@ -65,7 +65,7 @@ function updateProgress() {
 async function loadPuzzle() {
   const myToken = ++loadToken;   // marque cette génération et coupe toute solution/indice en cours
   busy = false;                  // interrompt une éventuelle animation de solution ou attente en cours
-  setStatus("Chargement…", "");
+  setStatus("", "");             // efface le statut précédent (pas de « Chargement… » : c'est instantané)
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
   hintLevel = 0; ply = 0; solved = false; explore = false; lastMove = []; loadedHints = null;
