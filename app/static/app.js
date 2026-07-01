@@ -6,6 +6,7 @@ let ply = 0;
 let hintLevel = 0;
 let solved = false;
 let busy = false;
+let loadToken = 0;        // génération : incrémentée à chaque « Nouveau » pour couper solution/indice en cours
 
 // Annotations (clic droit) et sélection (clic gauche)
 let annotations = [];     // [{kind:'arrow'|'circle', from, to}]
@@ -59,7 +60,8 @@ function updateProgress() {
 
 /* ---------- chargement d'un puzzle ---------- */
 async function loadPuzzle() {
-  if (busy) return;
+  const myToken = ++loadToken;   // marque cette génération et coupe toute solution/indice en cours
+  busy = false;                  // interrompt une éventuelle animation de solution ou attente en cours
   setStatus("Chargement…", "");
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
@@ -71,8 +73,10 @@ async function loadPuzzle() {
   const url = pinned ? `/api/puzzle?id=${encodeURIComponent(pinned)}`
                      : `/api/puzzle?min_rating=${b.min}&max_rating=${b.max}`;
   const r = await fetch(url);
+  if (myToken !== loadToken) return;   // un « Nouveau » plus récent a supplanté ce chargement
   if (!r.ok) { setStatus("Erreur : " + (await r.text()), "ko"); return; }
   puzzle = await r.json();
+  if (myToken !== loadToken) return;
   game = new Chess(puzzle.fen);
   const orientation = puzzle.side_to_move === "w" ? "white" : "black";
   const trait = puzzle.side_to_move === "w" ? "Blancs" : "Noirs";
@@ -183,12 +187,14 @@ function choosePromotion(target) {
 }
 
 async function validate(uci) {
+  const myToken = loadToken;
   busy = true;
   try {
     const r = await fetch("/api/attempt", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: puzzle.id, uci, ply }),
     });
+    if (myToken !== loadToken) return;   // « Nouveau » cliqué pendant la validation → on abandonne
     const data = await r.json();
     if (!data.correct) {
       setStatus(data.legal ? "❌ Pas la solution, réessaie." : "❌ Coup invalide.", "ko");
@@ -221,7 +227,7 @@ async function validate(uci) {
       const rep = data.opponent_san ? ` Réponse : ${data.opponent_san}.` : "";
       setStatus(`✅ Bon coup !${rep}`, "ok");
     }
-  } finally { busy = false; }
+  } finally { if (myToken === loadToken) busy = false; }
 }
 
 /* ---------- surcouche SVG : flèches + cases légales ---------- */
@@ -564,10 +570,13 @@ function drawAnnot() {
 async function nextHint() {
   if (!puzzle || solved) return;
   if (!loadedHints) {
+    const myToken = loadToken;
     setStatus("Réflexion du coach…", "");
     const r = await fetch(
       `/api/hints?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}`);
-    loadedHints = (await r.json()).hints;
+    const hints = (await r.json()).hints;
+    if (myToken !== loadToken) return;   // « Nouveau » cliqué pendant la réflexion → on abandonne
+    loadedHints = hints;
     setStatus("", "");
   }
   const MAX = 3;  // on ne montre que 3 indices (le 4e révélait la solution)
@@ -584,9 +593,11 @@ async function nextHint() {
 
 async function showSolution() {
   if (!puzzle || busy) return;
+  const myToken = loadToken;
   busy = true; solved = true; clearSelection(); clearRefute();
   try {
     const r = await fetch(`/api/solution?id=${encodeURIComponent(puzzle.id)}`);
+    if (myToken !== loadToken) return;   // « Nouveau » cliqué pendant le chargement de la solution
     const data = await r.json();
     $line.textContent = data.san.join("  ");
     $lineWrap.style.display = "block";
@@ -602,10 +613,13 @@ async function showSolution() {
     });
     // anime du début à la fin (puis navigable avec ⏮ ◀ ▶ ⏭)
     setStatus("Rejeu de la solution…", "");
-    for (let i = 0; i < history.length; i++) { showHist(i); await sleep(i === 0 ? 400 : 650); }
+    for (let i = 0; i < history.length; i++) {
+      if (myToken !== loadToken) return;   // « Nouveau » cliqué pendant le rejeu → on coupe l'animation
+      showHist(i); await sleep(i === 0 ? 400 : 650);
+    }
     explore = true;  // exploration libre après le rejeu (bonus, silencieux)
     setStatus("Solution affichée.", "ok");
-  } finally { busy = false; }
+  } finally { if (myToken === loadToken) busy = false; }
 }
 
 function escapeHtml(s) {
