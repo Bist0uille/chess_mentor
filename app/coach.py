@@ -180,32 +180,33 @@ def _hints_consistent(hints: List[str], sans: List[str]) -> bool:
     return True
 
 
-def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str]:
-    """Demande à Claude de mettre les SIGNAUX VÉRIFIÉS en mots façon coach."""
-    import anthropic
+# System prompt partagé (appel JSON classique ET appel streaming).
+_SYSTEM = (
+    "Tu es un entraîneur d'échecs francophone, clair et bienveillant. But : faire "
+    "RAISONNER l'élève, pas mémoriser. On te fournit des indices factuels DÉJÀ "
+    "VÉRIFIÉS (corrects et centrés sur LA solution) et la ligne solution complète, "
+    "pour t'ancrer. Tu n'en produis que 3 indices progressifs. Règles absolues :\n"
+    "1. Tu REFORMULES ces indices en un raisonnement de coach fluide. N'affirme QUE "
+    "ce qui figure dans la base : n'invente aucun coup, pièce, case ni menace, et "
+    "ne mentionne PAS d'autres idées/attaques que celles de la base.\n"
+    "2. TUTOIE l'élève (tu, ton, te) — jamais de vouvoiement.\n"
+    "3. Français à 100 % ; thèmes en français (« fourchette », pas « fork ») ; "
+    "notation française des pièces R/D/T/F/C, jamais K/Q/R/B/N.\n"
+    "4. Respecte la PROGRESSION en 3 indices : indice 1 = orientation, ne révèle NI "
+    "la case NI le coup ; indice 2 = la faiblesse/le signal clé ; indice 3 = oriente "
+    "vers la case/le motif pour DÉBLOQUER l'élève, SANS jamais donner le coup exact "
+    "ni révéler la solution (c'est à l'élève de trouver le coup final).\n"
+    "5. Concis : 1 à 2 phrases par indice, sans préfixe (« Indice 1 : »…)."
+)
 
-    client = anthropic.Anthropic()  # lit ANTHROPIC_API_KEY dans l'environnement
-    side = "les Blancs" if board.turn == chess.WHITE else "les Noirs"
-    # Base VÉRIFIÉE et déjà centrée sur la solution (évite les signaux hors-sujet).
-    base = explain.build_hints(board, sol_uci, themes, target_elo, signals)
+_FMT_JSON = ('Réponds UNIQUEMENT avec un objet JSON {"hints": ["…", "…", "…"]} '
+             "(exactement 3 chaînes, dans l'ordre des 3 indices), sans aucun texte "
+             "ni balise autour.")
+_FMT_LINES = ("Réponds avec EXACTEMENT 3 lignes, une par indice, dans l'ordre, sans "
+              "numéro ni préfixe ni ligne vide (un indice complet par ligne).")
 
-    system = (
-        "Tu es un entraîneur d'échecs francophone, clair et bienveillant. But : faire "
-        "RAISONNER l'élève, pas mémoriser. On te fournit des indices factuels DÉJÀ "
-        "VÉRIFIÉS (corrects et centrés sur LA solution) et la ligne solution complète, "
-        "pour t'ancrer. Tu n'en produis que 3 indices progressifs. Règles absolues :\n"
-        "1. Tu REFORMULES ces indices en un raisonnement de coach fluide. N'affirme QUE "
-        "ce qui figure dans la base : n'invente aucun coup, pièce, case ni menace, et "
-        "ne mentionne PAS d'autres idées/attaques que celles de la base.\n"
-        "2. TUTOIE l'élève (tu, ton, te) — jamais de vouvoiement.\n"
-        "3. Français à 100 % ; thèmes en français (« fourchette », pas « fork ») ; "
-        "notation française des pièces R/D/T/F/C, jamais K/Q/R/B/N.\n"
-        "4. Respecte la PROGRESSION en 3 indices : indice 1 = orientation, ne révèle NI "
-        "la case NI le coup ; indice 2 = la faiblesse/le signal clé ; indice 3 = oriente "
-        "vers la case/le motif pour DÉBLOQUER l'élève, SANS jamais donner le coup exact "
-        "ni révéler la solution (c'est à l'élève de trouver le coup final).\n"
-        "5. Concis : 1 à 2 phrases par indice, sans préfixe (« Indice 1 : »…)."
-    )
+
+def _user_payload(side, target_elo, themes, base, sans, fmt_reponse) -> str:
     niveau = ("débutant : sois plus explicite et encourageant"
               if target_elo and target_elo < 1200 else
               "joueur confirmé : sois dense et précis")
@@ -221,10 +222,41 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
                     "donner le coup. INTERDIT : citer un coup (notation) absent de "
                     "solution_notation_francaise — n'invente jamais de mat, d'échec ou de "
                     "capture qui n'y figure pas.",
-        "format_reponse": "Réponds UNIQUEMENT avec un objet JSON "
-                          '{"hints": ["…", "…", "…"]} (exactement 3 chaînes, dans '
-                          "l'ordre des 3 indices), sans aucun texte ni balise autour.",
+        "format_reponse": fmt_reponse,
     }
+    return json.dumps(user, ensure_ascii=False)
+
+
+def _hint_move_ok(hint: str, sans) -> bool:
+    """Vrai si l'indice ne cite aucun coup absent de la solution (per-indice)."""
+    allowed = {_norm_move(s) for s in sans}
+    return all(_norm_move(t) in allowed for t in _MOVE_RE.findall(hint))
+
+
+def _clean_hint_line(line: str) -> str:
+    """Retire un éventuel préfixe (« 1. », « - », « Indice 1 : ») d'une ligne."""
+    return re.sub(r"^(?:indice\s*\d+\s*[:\-.)]?\s*|\d+\s*[.)\-:]\s*|[-•*]\s*)",
+                  "", line.strip(), flags=re.I).strip()
+
+
+def _safe_hint(hint: str, base: List[str], i: int, sans) -> str:
+    """Indice validé : s'il cite un coup hors solution, on le remplace par le
+    repli déterministe correspondant (garde-fou anti-hallucination per-indice)."""
+    if _hint_move_ok(hint, sans):
+        return hint
+    print(f"[coach] indice {i + 1} incohérent (coup hors solution) → repli")
+    return base[i] if i < len(base) else hint
+
+
+def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str]:
+    """Demande à Claude de mettre les SIGNAUX VÉRIFIÉS en mots façon coach (non-stream)."""
+    import anthropic
+
+    client = anthropic.Anthropic()  # lit ANTHROPIC_API_KEY dans l'environnement
+    side = "les Blancs" if board.turn == chess.WHITE else "les Noirs"
+    # Base VÉRIFIÉE et déjà centrée sur la solution (évite les signaux hors-sujet).
+    base = explain.build_hints(board, sol_uci, themes, target_elo, signals)
+    user = _user_payload(side, target_elo, themes, base, sans, _FMT_JSON)
     # Sortie en texte brut (JSON demandé dans la consigne) plutôt que décodage
     # contraint json_schema : évite le surcoût de latence du mode structuré, la
     # robustesse étant assurée par le parsing tolérant + repli déterministe.
@@ -232,8 +264,8 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
         model=MODEL,
         max_tokens=MAX_TOKENS,
         temperature=0.3,
-        system=system,
-        messages=[{"role": "user", "content": json.dumps(user, ensure_ascii=False)}],
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": user}],
     )
     u = resp.usage
     # Coût estimé (Haiku 4.5 : 1$/1M in, 5$/1M out). Visible dans les logs Vercel.
@@ -251,6 +283,49 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
     if len(hints) < 3 or not _hints_consistent(hints, sans):
         return base
     return hints[:3]
+
+
+def _claude_hints_stream(board, signals, sans, sol_uci, themes, target_elo):
+    """Génère les 3 indices en streaming : yield (i, indice) dès qu'une ligne est
+    complète. Chaque indice est validé à la volée (repli per-indice si coup hors
+    solution). Le 1er indice s'affiche ainsi ~1 s au lieu d'attendre les 3."""
+    import anthropic
+
+    client = anthropic.Anthropic()
+    side = "les Blancs" if board.turn == chess.WHITE else "les Noirs"
+    base = explain.build_hints(board, sol_uci, themes, target_elo, signals)
+    user = _user_payload(side, target_elo, themes, base, sans, _FMT_LINES)
+    emitted = 0
+    with client.messages.stream(
+        model=MODEL, max_tokens=MAX_TOKENS, temperature=0.3,
+        system=_SYSTEM, messages=[{"role": "user", "content": user}],
+    ) as stream:
+        buf = ""
+        for chunk in stream.text_stream:
+            buf += chunk
+            while "\n" in buf and emitted < 3:
+                line, buf = buf.split("\n", 1)
+                hint = _clean_hint_line(line)
+                if not hint:
+                    continue
+                yield emitted, _safe_hint(hint, base, emitted, sans)
+                emitted += 1
+        if emitted < 3:  # dernière ligne éventuelle sans « \n » final
+            hint = _clean_hint_line(buf)
+            if hint:
+                yield emitted, _safe_hint(hint, base, emitted, sans)
+                emitted += 1
+        try:  # coût (usage disponible une fois le flux consommé)
+            u = stream.get_final_message().usage
+            cost = u.input_tokens / 1e6 * 1.0 + u.output_tokens / 1e6 * 5.0
+            print(f"[coach] {MODEL} (stream) in={u.input_tokens} out={u.output_tokens} "
+                  f"~${cost:.5f} (~{cost * 92:.3f} centimes EUR)")
+        except Exception:
+            pass
+    # Complète si le modèle a produit moins de 3 indices.
+    while emitted < 3:
+        yield emitted, base[emitted]
+        emitted += 1
 
 
 def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[str]:
@@ -286,3 +361,49 @@ def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[st
     hints = hints[:3]
     _HINT_CACHE[ck] = hints
     return hints
+
+
+def stream_hints(puzzle: dict, target_elo: int, force_llm: bool = False):
+    """Émet les 3 indices en NDJSON ({"i":…, "hint":…}\\n), un par ligne, au fil de
+    l'eau : le 1er indice part dès qu'il est prêt (~1 s) au lieu d'attendre les 3.
+
+    Alimente le même cache mémoire que get_hints (cache mutualisé entre les deux
+    endpoints). Repli déterministe si LLM désactivé / pas de clé / erreur API.
+    """
+    pid = puzzle["id"]
+    env_on = os.environ.get("CHESS_COACH_LLM", "on").lower() in ("on", "1", "true", "yes")
+    llm_on = (env_on or force_llm) and bool(os.environ.get("ANTHROPIC_API_KEY"))
+    ck = (pid, llm_on)
+
+    def line(i, h):
+        return json.dumps({"i": i, "hint": h}, ensure_ascii=False) + "\n"
+
+    if ck in _HINT_CACHE:  # déjà généré : on renvoie instantanément
+        for i, h in enumerate(_HINT_CACHE[ck]):
+            yield line(i, h)
+        return
+
+    board, sol_uci = position_to_solve(puzzle["fen"], puzzle["moves"])
+    signals = sd.detect_all(board)
+    sans = solution_san_fr(board, sol_uci)
+    themes = puzzle.get("themes", "") or ""
+
+    if not llm_on:  # gabarits déterministes (gratuit)
+        hints = explain.build_hints(board, sol_uci, themes, target_elo, signals)[:3]
+        for i, h in enumerate(hints):
+            yield line(i, h)
+        _HINT_CACHE[ck] = hints
+        return
+
+    collected: List[str] = []
+    try:
+        for i, h in _claude_hints_stream(board, signals, sans, sol_uci, themes, target_elo):
+            collected.append(h)
+            yield line(i, h)
+    except Exception as e:  # erreur API en cours de flux → on complète en déterministe
+        print(f"[coach] stream repli déterministe (erreur API : {e})")
+        base = explain.build_hints(board, sol_uci, themes, target_elo, signals)
+        for i in range(len(collected), 3):
+            collected.append(base[i])
+            yield line(i, base[i])
+    _HINT_CACHE[ck] = collected[:3]

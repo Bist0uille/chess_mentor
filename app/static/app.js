@@ -16,7 +16,9 @@ let annotStart = null;    // case de départ d'une flèche en cours
 let centers = {};         // case -> {x,y} en px relatifs à #board
 let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
-let loadedHints = null;   // les 3 indices, chargés en un seul appel
+let loadedHints = null;   // indices reçus en streaming (null = flux pas encore lancé)
+let hintStreaming = false; // un flux d'indices est en cours
+let hintWaiting = false;   // l'utilisateur attend l'indice suivant (pas encore arrivé)
 let refuteMove = null;    // flèche de réfutation (coup du moteur)
 let history = [];         // positions [{fen, lastMove, explain}] pour le navigateur
 let histIdx = 0;          // index courant dans l'historique
@@ -67,6 +69,7 @@ async function loadPuzzle() {
   $hints.innerHTML = "";
   $lineWrap.style.display = "none";
   hintLevel = 0; ply = 0; solved = false; explore = false; lastMove = []; loadedHints = null;
+  hintStreaming = false; hintWaiting = false;
   clearSelection(); annotations = []; clearRefute(); redrawAll();
   document.getElementById("movelog").style.display = "none";
   const b = band();
@@ -609,28 +612,68 @@ function drawAnnot() {
 }
 
 /* ---------- indices & solution ---------- */
-async function nextHint() {
+const HINT_MAX = 3;  // 3 indices ; le 3e débloque sans donner le coup
+
+// Clic sur « Indice » : lance le flux au 1er clic, puis affiche l'indice suivant
+// dès qu'il est disponible (les indices arrivent en streaming, ~1 s pour le 1er).
+function nextHint() {
   if (!puzzle || solved) return;
-  if (!loadedHints) {
-    const myToken = loadToken;
-    setStatus("Réflexion du coach…", "");
-    const r = await fetch(
-      `/api/hints?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}`);
-    const hints = (await r.json()).hints;
-    if (myToken !== loadToken) return;   // « Nouveau » cliqué pendant la réflexion → on abandonne
-    loadedHints = hints;
-    setStatus("", "");
-  }
-  const MAX = Math.min(3, loadedHints.length);  // 3 indices ; le 3e débloque sans donner le coup
-  if (hintLevel >= MAX) {
+  if (loadedHints === null) startHintStream();
+  showNextHint();
+}
+
+function showNextHint() {
+  if (hintLevel >= HINT_MAX) {
     setStatus("Plus d'indices — à toi de jouer.", "");
     return;
   }
-  hintLevel += 1;
-  const li = document.createElement("li");
-  li.innerHTML = `<b>Indice ${hintLevel}/${MAX} :</b> ` +
-    escapeHtml(loadedHints[hintLevel - 1]);
-  $hints.appendChild(li);
+  if (loadedHints && hintLevel < loadedHints.length && loadedHints[hintLevel]) {
+    hintWaiting = false;
+    const li = document.createElement("li");
+    li.innerHTML = `<b>Indice ${hintLevel + 1}/${HINT_MAX} :</b> ` +
+      escapeHtml(loadedHints[hintLevel]);
+    $hints.appendChild(li);
+    hintLevel += 1;
+    setStatus("", "");
+  } else {
+    hintWaiting = true;                    // pas encore arrivé → on attend le flux
+    setStatus("Réflexion du coach…", "");
+  }
+}
+
+// Ouvre le flux NDJSON des indices et remplit loadedHints au fil de l'eau.
+async function startHintStream() {
+  loadedHints = [];
+  hintStreaming = true;
+  const myToken = loadToken;
+  try {
+    const resp = await fetch(
+      `/api/hints_stream?id=${encodeURIComponent(puzzle.id)}&target_elo=${band().elo}`);
+    if (!resp.ok || !resp.body) throw new Error("flux indisponible");
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (myToken !== loadToken) { reader.cancel(); return; }  // « Nouveau » → on coupe
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const raw = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!raw) continue;
+        let obj; try { obj = JSON.parse(raw); } catch (e) { continue; }
+        if (typeof obj.hint === "string") {
+          loadedHints[obj.i] = obj.hint;
+          if (hintWaiting) showNextHint();   // l'utilisateur attendait cet indice
+        }
+      }
+    }
+  } catch (e) {
+    if (myToken === loadToken && hintWaiting) setStatus("Coach indisponible, réessaie.", "ko");
+  } finally {
+    if (myToken === loadToken) hintStreaming = false;
+  }
 }
 
 async function showSolution() {
