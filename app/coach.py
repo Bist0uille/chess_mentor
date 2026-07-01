@@ -191,19 +191,19 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
 
     system = (
         "Tu es un entraîneur d'échecs francophone, clair et bienveillant. But : faire "
-        "RAISONNER l'élève, pas mémoriser. On te fournit 4 indices factuels DÉJÀ "
-        "VÉRIFIÉS (corrects et centrés sur LA solution) et la ligne solution. Règles "
-        "absolues :\n"
+        "RAISONNER l'élève, pas mémoriser. On te fournit des indices factuels DÉJÀ "
+        "VÉRIFIÉS (corrects et centrés sur LA solution) et la ligne solution complète, "
+        "pour t'ancrer. Tu n'en produis que 3 indices progressifs. Règles absolues :\n"
         "1. Tu REFORMULES ces indices en un raisonnement de coach fluide. N'affirme QUE "
         "ce qui figure dans la base : n'invente aucun coup, pièce, case ni menace, et "
         "ne mentionne PAS d'autres idées/attaques que celles de la base.\n"
         "2. TUTOIE l'élève (tu, ton, te) — jamais de vouvoiement.\n"
         "3. Français à 100 % ; thèmes en français (« fourchette », pas « fork ») ; "
         "notation française des pièces R/D/T/F/C, jamais K/Q/R/B/N.\n"
-        "4. Respecte la PROGRESSION : indice 1 = orientation, ne révèle NI la case NI le "
-        "coup ; indice 2 = la faiblesse/le signal clé ; indice 3 = oriente vers la "
-        "case/le motif SANS donner le coup exact ; indice 4 = donne le 1er coup et "
-        "explique pourquoi il gagne (idée de la suite incluse).\n"
+        "4. Respecte la PROGRESSION en 3 indices : indice 1 = orientation, ne révèle NI "
+        "la case NI le coup ; indice 2 = la faiblesse/le signal clé ; indice 3 = oriente "
+        "vers la case/le motif pour DÉBLOQUER l'élève, SANS jamais donner le coup exact "
+        "ni révéler la solution (c'est à l'élève de trouver le coup final).\n"
         "5. Concis : 1 à 2 phrases par indice, sans préfixe (« Indice 1 : »…)."
     )
     niveau = ("débutant : sois plus explicite et encourageant"
@@ -216,13 +216,14 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
         "themes": themes_fr(themes),
         "indices_factuels_verifies_a_reformuler": base,
         "solution_notation_francaise": sans,
-        "consigne": "Réécris ces 4 indices en vrai coach (tutoiement), en respectant "
-                    "strictement la base et la progression ci-dessus. INTERDIT : citer "
-                    "un coup (notation) absent de solution_notation_francaise — n'invente "
-                    "jamais de mat, d'échec ou de capture qui n'y figure pas.",
+        "consigne": "Rédige 3 indices de coach (tutoiement) en t'appuyant strictement "
+                    "sur la base et la progression ci-dessus. Le 3e indice débloque sans "
+                    "donner le coup. INTERDIT : citer un coup (notation) absent de "
+                    "solution_notation_francaise — n'invente jamais de mat, d'échec ou de "
+                    "capture qui n'y figure pas.",
         "format_reponse": "Réponds UNIQUEMENT avec un objet JSON "
-                          '{"hints": ["…", "…", "…", "…"]} (exactement 4 chaînes, '
-                          "dans l'ordre des 4 indices), sans aucun texte ni balise autour.",
+                          '{"hints": ["…", "…", "…"]} (exactement 3 chaînes, dans '
+                          "l'ordre des 3 indices), sans aucun texte ni balise autour.",
     }
     # Sortie en texte brut (JSON demandé dans la consigne) plutôt que décodage
     # contraint json_schema : évite le surcoût de latence du mode structuré, la
@@ -247,13 +248,13 @@ def _claude_hints(board, signals, sans, sol_uci, themes, target_elo) -> List[str
         return base
     # Garde-fou : si le LLM cite un coup hors solution (hallucination), on jette
     # tout et on rend les indices déterministes (corrects).
-    if len(hints) < 4 or not _hints_consistent(hints, sans):
+    if len(hints) < 3 or not _hints_consistent(hints, sans):
         return base
-    return hints[:4]
+    return hints[:3]
 
 
 def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[str]:
-    """Renvoie les 4 indices pour un puzzle (avec cache).
+    """Renvoie les 3 indices affichés pour un puzzle (avec cache).
 
     Narrateur Claude désactivé par défaut (économie de tokens) : activé via la
     variable d'env CHESS_COACH_LLM=on, ou ponctuellement via force_llm (tests).
@@ -281,5 +282,7 @@ def get_hints(puzzle: dict, target_elo: int, force_llm: bool = False) -> List[st
     else:
         hints = explain.build_hints(board, sol_uci, themes, target_elo, signals)
 
+    # On n'affiche que 3 indices : le 4e (repli déterministe) révèle la solution.
+    hints = hints[:3]
     _HINT_CACHE[ck] = hints
     return hints

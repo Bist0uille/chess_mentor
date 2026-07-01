@@ -17,6 +17,20 @@ STATIC = os.path.join(HERE, "static")
 app = FastAPI(title="Chess Mentor — coach de raisonnement")
 
 
+@app.get("/api/stream_test")
+def stream_test():
+    """TEMPORAIRE : teste si Vercel streame les réponses Python (à retirer)."""
+    import time as _t
+
+    from fastapi.responses import StreamingResponse
+
+    def gen():
+        for i in range(4):
+            yield f"chunk {i}\n"
+            _t.sleep(1)
+    return StreamingResponse(gen(), media_type="text/plain")
+
+
 @app.get("/api/health")
 def health():
     """Endpoint ultra-léger (ni DB ni LLM) pour maintenir l'instance chaude.
@@ -129,7 +143,7 @@ def post_hint(req: HintReq):
 
 @app.get("/api/hints")
 def get_all_hints(id: str, target_elo: int | None = None):
-    """Les 4 indices en un seul appel (1 seule requête Claude par puzzle si activé)."""
+    """Les 3 indices en un seul appel (1 seule requête Claude par puzzle si activé)."""
     puz = db.get_puzzle(id)
     if not puz:
         raise HTTPException(404, "Puzzle introuvable.")

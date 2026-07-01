@@ -16,7 +16,7 @@ let annotStart = null;    // case de départ d'une flèche en cours
 let centers = {};         // case -> {x,y} en px relatifs à #board
 let sqSize = 50;
 let lastMove = [];        // cases du dernier coup joué (surbrillance)
-let loadedHints = null;   // les 4 indices, chargés en un seul appel
+let loadedHints = null;   // les 3 indices, chargés en un seul appel
 let refuteMove = null;    // flèche de réfutation (coup du moteur)
 let history = [];         // positions [{fen, lastMove, explain}] pour le navigateur
 let histIdx = 0;          // index courant dans l'historique
@@ -621,7 +621,7 @@ async function nextHint() {
     loadedHints = hints;
     setStatus("", "");
   }
-  const MAX = 3;  // on ne montre que 3 indices (le 4e révélait la solution)
+  const MAX = Math.min(3, loadedHints.length);  // 3 indices ; le 3e débloque sans donner le coup
   if (hintLevel >= MAX) {
     setStatus("Plus d'indices — à toi de jouer.", "");
     return;

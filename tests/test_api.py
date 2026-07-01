@@ -15,10 +15,10 @@ def test_puzzle_by_id(client, all_puzzles):
     assert p["id"] == pid  # déterminisme (lien partageable / e2e)
 
 
-def test_hints_four(client):
+def test_hints_three(client):
     pid = client.get("/api/puzzle").json()["id"]
     h = client.get(f"/api/hints?id={pid}").json()["hints"]
-    assert len(h) == 4 and all(h)
+    assert len(h) == 3 and all(h)
 
 
 def test_solution_shape(client):
